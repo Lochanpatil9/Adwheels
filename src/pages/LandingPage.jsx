@@ -2,9 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-const SUPABASE_URL = 'https://bdrghzrqnlkrzzwezbem.supabase.co'
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkcmdoenJxbmxrcnp6d2V6YmVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzg1ODcsImV4cCI6MjA4ODY1NDU4N30.LEdPFP3fFmMu_MnJy3_A5bHqBpH57nE_I3B8nM0IlIk'
-
 /* ─── Reveal on scroll hook ─── */
 function useReveal() {
   useEffect(() => {
@@ -59,29 +56,17 @@ export default function LandingPage({ onGetStarted }) {
     }
     setEntSubmitting(true)
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/enterprise_leads`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON,
-          'Authorization': `Bearer ${SUPABASE_ANON}`,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          full_name: entForm.name,
-          phone: entForm.phone,
-          email: entForm.email,
-          company_name: entForm.company,
-          city: entForm.city,
-          message: entForm.message,
-        })
+      const { error } = await supabase.from('enterprise_leads').insert({
+        full_name: entForm.name,
+        phone: entForm.phone,
+        email: entForm.email,
+        company_name: entForm.company,
+        city: entForm.city,
+        message: entForm.message,
       })
-      if (res.ok || res.status === 201) {
-        setEntDone(true)
-        toast.success('Request sent! We\'ll call you within 2 hours 🎉')
-      } else {
-        throw new Error('Failed')
-      }
+      if (error) throw error
+      setEntDone(true)
+      toast.success('Request sent! We\'ll call you within 2 hours 🎉')
     } catch {
       toast.error('Something went wrong. Please call us directly!')
     }
