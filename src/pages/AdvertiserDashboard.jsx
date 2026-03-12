@@ -285,24 +285,27 @@ export default function AdvertiserDashboard({ profile }) {
 
     const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(fileName)
 
-    const { error } = await supabase.from('campaigns').insert({
+    const plan = selectedPlan  // capture before state reset
+
+    const { data: insertedCampaign, error } = await supabase.from('campaigns').insert({
       advertiser_id: profile.id,
-      plan_id: selectedPlan.id,
+      plan_id: plan.id,
       banner_url: publicUrl,
       city: form.city,
       area: form.area,
       company_name: form.company_name,
       status: 'pending',
-    })
+    }).select('*').single()
 
     if (error) { toast.error(error.message); setSubmitting(false); return }
 
-    toast.success('Campaign created! 🎉 Complete payment to go live.')
-    setTab('campaigns')
-    fetchCampaigns()
     setSelectedPlan(null); setBannerFile(null); setBannerPreview(null)
     setForm({ company_name:'', city:'', area:'' })
     setSubmitting(false)
+    fetchCampaigns()
+
+    // Immediately open the Razorpay payment modal for the newly created campaign
+    handlePayment({ ...insertedCampaign, plans: plan })
   }
 
   // Helper to show campaign name nicely
@@ -358,13 +361,24 @@ export default function AdvertiserDashboard({ profile }) {
               </div>
             : campaigns.slice(0,3).map(c => (
               <div key={c.id} style={s.card}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                  <div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'12px'}}>
+                  <div style={{flex:1}}>
                     <div style={{fontFamily:'Syne',fontWeight:700,fontSize:'1rem',marginBottom:'6px'}}>{campaignTitle(c)}</div>
                     <div style={{fontSize:'0.82rem',color:'rgba(245,240,232,0.4)',marginBottom:'8px'}}>📍 {c.city} — {c.area}</div>
                     <span style={s.badge(c.status)}>{c.status}</span>
                   </div>
-                  {c.banner_url && <img src={c.banner_url} alt="banner" style={{width:'80px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid var(--border)'}}/>}
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'8px'}}>
+                    {c.banner_url && <img src={c.banner_url} alt="banner" style={{width:'80px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid var(--border)'}}/>}
+                    {c.status === 'pending' && (
+                      <button
+                        style={{background:'var(--yellow)',color:'var(--black)',fontFamily:'Syne',fontSize:'0.82rem',fontWeight:800,padding:'8px 16px',border:'none',borderRadius:'6px',cursor:'pointer',whiteSpace:'nowrap'}}
+                        onClick={() => handlePayment(c)}
+                        disabled={payingId === c.id}
+                      >
+                        {payingId === c.id ? '⏳...' : `💳 Pay ₹${c.plans?.price?.toLocaleString()}`}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
