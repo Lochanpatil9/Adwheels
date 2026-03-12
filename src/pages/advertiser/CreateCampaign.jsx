@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { openRazorpayCheckout } from '../../lib/razorpay'
+import toast from 'react-hot-toast'
 import AppLayout from '../../components/AppLayout'
 
 const NAV = [
@@ -55,25 +57,40 @@ export default function CreateCampaign() {
         bannerUrl = urlData.publicUrl
       }
 
-      // Insert campaign into DB
-      const { error: campaignError } = await supabase.from('campaigns').insert({
+      // Insert campaign into DB and get its ID
+      const { data: campaignData, error: campaignError } = await supabase.from('campaigns').insert({
         advertiser_id: profile.id,
         plan_id: selectedPlan.id,
         banner_url: bannerUrl,
         city,
         area,
         status: 'pending',
-      })
+      }).select().single()
 
       if (campaignError) throw campaignError
 
-      // 🎓 NOTE: After this, Razorpay payment will be triggered (Phase 3)
-      // For now we go straight to campaigns list
-      navigate('/advertiser/campaigns')
+      setLoading(false)
+
+      // Trigger Razorpay checkout immediately after campaign creation
+      openRazorpayCheckout({
+        amount: selectedPlan.price,
+        campaignId: campaignData.id,
+        planName: selectedPlan.name,
+        profile,
+        onSuccess: () => {
+          toast.success('Payment successful! 🎉 Your campaign has been activated.')
+          navigate('/advertiser/campaigns')
+        },
+        onFailure: (msg) => {
+          if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.')
+          else toast('Campaign saved. Complete payment anytime from My Campaigns.', { icon: 'ℹ️' })
+          navigate('/advertiser/campaigns')
+        },
+      })
     } catch (err) {
+      setLoading(false)
       setError(err.message)
     }
-    setLoading(false)
   }
 
   return (

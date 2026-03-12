@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { openRazorpayCheckout } from '../lib/razorpay'
 import toast from 'react-hot-toast'
 import { LogOut, Plus, BarChart2 } from 'lucide-react'
 
@@ -220,7 +221,7 @@ export default function AdvertiserDashboard({ profile }) {
 
     const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(fileName)
 
-    const { error } = await supabase.from('campaigns').insert({
+    const { data: campaignData, error } = await supabase.from('campaigns').insert({
       advertiser_id: profile.id,
       plan_id: selectedPlan.id,
       banner_url: publicUrl,
@@ -228,16 +229,32 @@ export default function AdvertiserDashboard({ profile }) {
       area: form.area,
       company_name: form.company_name,
       status: 'pending',
-    })
+    }).select().single()
 
     if (error) { toast.error(error.message); setSubmitting(false); return }
 
-    toast.success('Campaign created! 🎉 Complete payment to go live.')
-    setTab('campaigns')
-    fetchCampaigns()
+    setSubmitting(false)
     setSelectedPlan(null); setBannerFile(null); setBannerPreview(null)
     setForm({ company_name:'', city:'', area:'' })
-    setSubmitting(false)
+
+    // Trigger Razorpay checkout immediately after campaign creation
+    openRazorpayCheckout({
+      amount: selectedPlan.price,
+      campaignId: campaignData.id,
+      planName: selectedPlan.name,
+      profile,
+      onSuccess: () => {
+        toast.success('Payment successful! 🎉 Your campaign has been activated.')
+        setTab('campaigns')
+        fetchCampaigns()
+      },
+      onFailure: (msg) => {
+        if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.')
+        else toast('Campaign saved. Complete payment anytime from My Campaigns.', { icon: 'ℹ️' })
+        setTab('campaigns')
+        fetchCampaigns()
+      },
+    })
   }
 
   // Helper to show campaign name nicely
@@ -298,6 +315,21 @@ export default function AdvertiserDashboard({ profile }) {
                     <div style={{fontFamily:'Syne',fontWeight:700,fontSize:'1rem',marginBottom:'6px'}}>{campaignTitle(c)}</div>
                     <div style={{fontSize:'0.82rem',color:'rgba(245,240,232,0.4)',marginBottom:'8px'}}>📍 {c.city} — {c.area}</div>
                     <span style={s.badge(c.status)}>{c.status}</span>
+                    {c.status === 'pending' && (
+                      <button
+                        style={{display:'block',marginTop:'10px',background:'var(--yellow)',color:'var(--black)',fontFamily:'Syne',fontSize:'0.8rem',fontWeight:800,padding:'7px 16px',border:'none',borderRadius:'6px',cursor:'pointer'}}
+                        onClick={() => openRazorpayCheckout({
+                          amount: c.plans?.price,
+                          campaignId: c.id,
+                          planName: c.plans?.name,
+                          profile,
+                          onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+                          onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
+                        })}
+                      >
+                        💳 Pay Now
+                      </button>
+                    )}
                   </div>
                   {c.banner_url && <img src={c.banner_url} alt="banner" style={{width:'80px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid var(--border)'}}/>}
                 </div>
@@ -324,8 +356,20 @@ export default function AdvertiserDashboard({ profile }) {
                     </div>
                     {c.status === 'pending' && (
                       <div style={{padding:'12px',background:'rgba(255,208,0,0.08)',borderRadius:'8px',border:'1px solid rgba(255,208,0,0.2)'}}>
-                        <div style={{fontSize:'0.82rem',color:'var(--yellow)',fontWeight:600}}>⚠️ Payment pending — campaign not yet live</div>
-                        <div style={{fontSize:'0.78rem',color:'rgba(245,240,232,0.4)',marginTop:'4px'}}>Contact us on WhatsApp to activate manually.</div>
+                        <div style={{fontSize:'0.82rem',color:'var(--yellow)',fontWeight:600,marginBottom:'8px'}}>⚠️ Payment pending — campaign not yet live</div>
+                        <button
+                          style={{background:'var(--yellow)',color:'var(--black)',fontFamily:'Syne',fontSize:'0.82rem',fontWeight:800,padding:'8px 18px',border:'none',borderRadius:'6px',cursor:'pointer'}}
+                          onClick={() => openRazorpayCheckout({
+                            amount: c.plans?.price,
+                            campaignId: c.id,
+                            planName: c.plans?.name,
+                            profile,
+                            onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+                            onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
+                          })}
+                        >
+                          💳 Pay Now ₹{c.plans?.price?.toLocaleString()}
+                        </button>
                       </div>
                     )}
                     {(c.status === 'active' || c.status === 'paid') && (

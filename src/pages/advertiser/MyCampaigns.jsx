@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { openRazorpayCheckout } from '../../lib/razorpay'
+import toast from 'react-hot-toast'
 import AppLayout from '../../components/AppLayout'
 
 const NAV = [
@@ -101,7 +103,16 @@ export default function MyCampaigns() {
                   ₹{c.plans?.price?.toLocaleString()}<span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'DM Sans' }}>/mo</span>
                 </span>
                 {c.status === 'pending' && (
-                  <button className="btn btn-yellow btn-sm">Pay Now →</button>
+                  <button className="btn btn-yellow btn-sm" onClick={() =>
+                    openRazorpayCheckout({
+                      amount: c.plans?.price,
+                      campaignId: c.id,
+                      planName: c.plans?.name,
+                      profile,
+                      onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+                      onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
+                    })
+                  }>Pay Now →</button>
                 )}
                 {c.status === 'active' && c.plans?.has_live_tracking && (
                   <button className="btn btn-green btn-sm">📍 Live Track</button>
