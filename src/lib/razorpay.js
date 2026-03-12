@@ -37,14 +37,24 @@ export async function openRazorpayCheckout({ amount, campaignId, planName, profi
     name: 'AdWheels',
     description: `${planName} Campaign — 1 month`,
     handler: async function (response) {
-      // Mark campaign as paid in Supabase
-      const { error } = await supabase
+      // Step 1 (critical): mark campaign as paid
+      const { error: statusError } = await supabase
         .from('campaigns')
-        .update({ status: 'paid', razorpay_payment_id: response.razorpay_payment_id })
+        .update({ status: 'paid' })
         .eq('id', campaignId)
-      if (error) {
-        console.error('Failed to update campaign status after payment:', error.message)
+
+      if (statusError) {
+        console.error('Failed to update campaign status after payment:', statusError.message)
+        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign. Please contact support.`)
+        return
       }
+
+      // Step 2 (best-effort): store the Razorpay payment ID for reference
+      await supabase
+        .from('campaigns')
+        .update({ razorpay_payment_id: response.razorpay_payment_id })
+        .eq('id', campaignId)
+
       if (onSuccess) onSuccess(response)
     },
     prefill: {
