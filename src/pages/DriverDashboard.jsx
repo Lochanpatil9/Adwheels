@@ -442,6 +442,7 @@ export default function DriverDashboard({ profile }) {
               placeholder="Enter amount (min ₹500)"
               value={payoutAmount}
               onChange={e => setPayoutAmount(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleRequestPayout()}
               style={{width:'100%', background:'rgba(245,240,232,0.04)', border:'1.5px solid rgba(245,240,232,0.09)', borderRadius:'8px', padding:'13px 15px', color:'var(--white)', fontSize:'0.93rem', outline:'none', marginBottom:'16px'}}
             />
             <button style={s.btn} onClick={handleRequestPayout} disabled={payoutLoading}>

@@ -11,4 +11,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 input, select, textarea, button { font-family: inherit; }
+input, select, textarea { box-sizing: border-box; }
 a { text-decoration: none; color: inherit; }
+
+/* Global focus glow — yellow ring on every input */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2.5px rgba(255,208,0,0.22);
+}
+
+/* Disabled buttons */
+button:disabled { opacity: 0.5; cursor: not-allowed !important; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(245,240,232,0.1); border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,208,0,0.3); }

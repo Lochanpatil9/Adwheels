@@ -186,6 +186,7 @@ export default function AdvertiserDashboard({ profile }) {
   const [form, setForm] = useState({ company_name:'', city:'', area:'' })
   const [submitting, setSubmitting] = useState(false)
   const [analyticsFor, setAnalyticsFor] = useState(null)
+  const [payingId, setPayingId] = useState(null)
 
   useEffect(() => { fetchCampaigns() }, [])
 
@@ -197,6 +198,70 @@ export default function AdvertiserDashboard({ profile }) {
       .order('created_at', { ascending: false })
     setCampaigns(data || [])
     setLoading(false)
+  }
+
+  function loadRazorpay() {
+    return new Promise(resolve => {
+      if (window.Razorpay) { resolve(true); return }
+      const script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.onload = () => resolve(true)
+      script.onerror = () => resolve(false)
+      document.body.appendChild(script)
+    })
+  }
+
+  async function handlePayment(campaign) {
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID
+    if (!razorpayKey) {
+      toast.error('Payment gateway not configured. Please contact support.')
+      return
+    }
+    setPayingId(campaign.id)
+    const loaded = await loadRazorpay()
+    if (!loaded) {
+      toast.error('Payment gateway failed to load. Please try again.')
+      setPayingId(null)
+      return
+    }
+
+    const options = {
+      key: razorpayKey,
+      amount: campaign.plans.price * 100,
+      currency: 'INR',
+      name: 'AdWheels',
+      description: `${campaign.plans.name} Plan — ${campaign.city}`,
+      handler: async function (response) {
+        const { error } = await supabase
+          .from('campaigns')
+          .update({ status: 'paid', razorpay_payment_id: response.razorpay_payment_id })
+          .eq('id', campaign.id)
+        if (error) {
+          toast.error(`Payment received (ID: ${response.razorpay_payment_id}) but campaign update failed. Please contact support.`)
+          setPayingId(null)
+          return
+        }
+        const { error: assignError } = await supabase.rpc('auto_assign_drivers', { campaign_id: campaign.id })
+        if (assignError) {
+          toast.error('Payment successful but driver assignment failed — our team will assign drivers shortly.')
+        } else {
+          toast.success('Payment successful! 🎉 Drivers are being assigned — go live in 90 min.')
+        }
+        fetchCampaigns()
+        setTab('campaigns')
+        setPayingId(null)
+      },
+      prefill: { name: profile.full_name, contact: profile.phone },
+      theme: { color: '#FFD000' },
+      modal: { ondismiss: () => setPayingId(null) },
+    }
+
+    const rzp = new window.Razorpay(options)
+    rzp.on('payment.failed', function (response) {
+      toast.error('Payment failed: ' + response.error.description)
+      setPayingId(null)
+    })
+    rzp.open()
   }
 
   function handleBannerSelect(e) {
@@ -220,24 +285,27 @@ export default function AdvertiserDashboard({ profile }) {
 
     const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(fileName)
 
-    const { error } = await supabase.from('campaigns').insert({
+    const plan = selectedPlan  // capture before state reset
+
+    const { data: insertedCampaign, error } = await supabase.from('campaigns').insert({
       advertiser_id: profile.id,
-      plan_id: selectedPlan.id,
+      plan_id: plan.id,
       banner_url: publicUrl,
       city: form.city,
       area: form.area,
       company_name: form.company_name,
       status: 'pending',
-    })
+    }).select('*').single()
 
     if (error) { toast.error(error.message); setSubmitting(false); return }
 
-    toast.success('Campaign created! 🎉 Complete payment to go live.')
-    setTab('campaigns')
-    fetchCampaigns()
     setSelectedPlan(null); setBannerFile(null); setBannerPreview(null)
     setForm({ company_name:'', city:'', area:'' })
     setSubmitting(false)
+    fetchCampaigns()
+
+    // Immediately open the Razorpay payment modal for the newly created campaign
+    handlePayment({ ...insertedCampaign, plans: plan })
   }
 
   // Helper to show campaign name nicely
@@ -293,13 +361,24 @@ export default function AdvertiserDashboard({ profile }) {
               </div>
             : campaigns.slice(0,3).map(c => (
               <div key={c.id} style={s.card}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                  <div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'12px'}}>
+                  <div style={{flex:1}}>
                     <div style={{fontFamily:'Syne',fontWeight:700,fontSize:'1rem',marginBottom:'6px'}}>{campaignTitle(c)}</div>
                     <div style={{fontSize:'0.82rem',color:'rgba(245,240,232,0.4)',marginBottom:'8px'}}>📍 {c.city} — {c.area}</div>
                     <span style={s.badge(c.status)}>{c.status}</span>
                   </div>
-                  {c.banner_url && <img src={c.banner_url} alt="banner" style={{width:'80px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid var(--border)'}}/>}
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:'8px'}}>
+                    {c.banner_url && <img src={c.banner_url} alt="banner" style={{width:'80px',height:'50px',objectFit:'cover',borderRadius:'6px',border:'1px solid var(--border)'}}/>}
+                    {c.status === 'pending' && (
+                      <button
+                        style={{background:'var(--yellow)',color:'var(--black)',fontFamily:'Syne',fontSize:'0.82rem',fontWeight:800,padding:'8px 16px',border:'none',borderRadius:'6px',cursor:'pointer',whiteSpace:'nowrap'}}
+                        onClick={() => handlePayment(c)}
+                        disabled={payingId === c.id}
+                      >
+                        {payingId === c.id ? '⏳...' : `💳 Pay ₹${c.plans?.price?.toLocaleString()}`}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -324,8 +403,16 @@ export default function AdvertiserDashboard({ profile }) {
                     </div>
                     {c.status === 'pending' && (
                       <div style={{padding:'12px',background:'rgba(255,208,0,0.08)',borderRadius:'8px',border:'1px solid rgba(255,208,0,0.2)'}}>
-                        <div style={{fontSize:'0.82rem',color:'var(--yellow)',fontWeight:600}}>⚠️ Payment pending — campaign not yet live</div>
-                        <div style={{fontSize:'0.78rem',color:'rgba(245,240,232,0.4)',marginTop:'4px'}}>Contact us on WhatsApp to activate manually.</div>
+                        <div style={{fontSize:'0.82rem',color:'var(--yellow)',fontWeight:600,marginBottom:'10px'}}>
+                          ⚠️ Payment pending — complete payment to go live in 90 minutes
+                        </div>
+                        <button
+                          style={{background:'var(--yellow)',color:'var(--black)',fontFamily:'Syne',fontSize:'0.85rem',fontWeight:800,padding:'10px 20px',border:'none',borderRadius:'6px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px'}}
+                          onClick={() => handlePayment(c)}
+                          disabled={payingId === c.id}
+                        >
+                          {payingId === c.id ? '⏳ Loading...' : `💳 Pay ₹${c.plans?.price?.toLocaleString()}`}
+                        </button>
                       </div>
                     )}
                     {(c.status === 'active' || c.status === 'paid') && (

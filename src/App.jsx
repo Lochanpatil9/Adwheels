@@ -45,9 +45,9 @@ function ResetPasswordPage() {
         <div style={s.title}>Set New Password</div>
         <div style={s.sub}>Choose a strong new password for your account</div>
         <label style={s.label}>New Password</label>
-        <input style={s.input} type="password" placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} />
+        <input style={s.input} type="password" placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleReset()} />
         <label style={s.label}>Confirm Password</label>
-        <input style={s.input} type="password" placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} />
+        <input style={s.input} type="password" placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleReset()} />
         <button style={s.btn} onClick={handleReset} disabled={loading}>
           {loading ? 'Updating...' : 'Update Password'}
         </button>

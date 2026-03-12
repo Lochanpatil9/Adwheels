@@ -2,9 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-const SUPABASE_URL = 'https://bdrghzrqnlkrzzwezbem.supabase.co'
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkcmdoenJxbmxrcnp6d2V6YmVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzg1ODcsImV4cCI6MjA4ODY1NDU4N30.LEdPFP3fFmMu_MnJy3_A5bHqBpH57nE_I3B8nM0IlIk'
-
 /* ─── Reveal on scroll hook ─── */
 function useReveal() {
   useEffect(() => {
@@ -59,29 +56,17 @@ export default function LandingPage({ onGetStarted }) {
     }
     setEntSubmitting(true)
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/enterprise_leads`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON,
-          'Authorization': `Bearer ${SUPABASE_ANON}`,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          full_name: entForm.name,
-          phone: entForm.phone,
-          email: entForm.email,
-          company_name: entForm.company,
-          city: entForm.city,
-          message: entForm.message,
-        })
+      const { error } = await supabase.from('enterprise_leads').insert({
+        full_name: entForm.name,
+        phone: entForm.phone,
+        email: entForm.email,
+        company_name: entForm.company,
+        city: entForm.city,
+        message: entForm.message,
       })
-      if (res.ok || res.status === 201) {
-        setEntDone(true)
-        toast.success('Request sent! We\'ll call you within 2 hours 🎉')
-      } else {
-        throw new Error('Failed')
-      }
+      if (error) throw error
+      setEntDone(true)
+      toast.success('Request sent! We\'ll call you within 2 hours 🎉')
     } catch {
       toast.error('Something went wrong. Please call us directly!')
     }
@@ -134,11 +119,15 @@ export default function LandingPage({ onGetStarted }) {
         @media (max-width: 768px) {
           section { padding: 64px 20px; }
           .aw-hide-mobile { display: none !important; }
+          .aw-mobile-menu-btn { display: flex !important; }
+          .aw-grid-2 { grid-template-columns: 1fr !important; }
+          .aw-grid-2-gap { gap: 40px !important; }
+          .aw-mobile-menu-open { display: flex !important; }
         }
       `}</style>
 
       {/* ─── NAV ─── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(8,8,8,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px' }}>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(8,8,8,0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', padding: '0 24px 0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px' }}>
         <div style={{ fontFamily: 'Bebas Neue', fontSize: '1.8rem', color: 'var(--yellow)', letterSpacing: '0.05em', cursor: 'pointer' }} onClick={() => scrollTo('hero')}>AdWheels</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }} className="aw-hide-mobile">
           <button className="aw-nav-link" onClick={() => scrollTo('how')}>How It Works</button>
@@ -147,8 +136,30 @@ export default function LandingPage({ onGetStarted }) {
           <button className="aw-nav-link" onClick={() => scrollTo('register')}>Drivers</button>
           <button className="aw-btn-primary" style={{ padding: '10px 22px', fontSize: '0.85rem' }} onClick={onGetStarted}>Login / Sign Up</button>
         </div>
-        <button style={{ background: 'none', border: 'none', color: '#F5F0E8', cursor: 'pointer', fontSize: '1.5rem', display: 'none' }} className="aw-mobile-menu">☰</button>
+        {/* Hamburger button — visible only on mobile */}
+        <button
+          className="aw-mobile-menu-btn"
+          onClick={() => setMobileMenuOpen(o => !o)}
+          style={{ display: 'none', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--border)', borderRadius: '8px', color: '#F5F0E8', cursor: 'pointer', fontSize: '1.25rem', width: '40px', height: '40px', flexShrink: 0 }}
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
       </nav>
+
+      {/* ─── MOBILE MENU ─── */}
+      {mobileMenuOpen && (
+        <div
+          style={{ position: 'fixed', top: '64px', left: 0, right: 0, zIndex: 99, background: 'rgba(8,8,8,0.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '24px 32px', gap: '20px' }}
+        >
+          {[['How It Works', 'how'], ['Pricing', 'pricing'], ['Drivers', 'register']].map(([label, id]) => (
+            <button key={id} className="aw-nav-link" onClick={() => { scrollTo(id); setMobileMenuOpen(false) }} style={{ fontSize: '1rem', padding: '4px 0', textAlign: 'left' }}>{label}</button>
+          ))}
+          <button className="aw-nav-link" onClick={() => { scrollTo('enterprise'); setMobileMenuOpen(false) }} style={{ fontSize: '1rem', padding: '4px 0', textAlign: 'left', color: 'var(--purple)' }}>Enterprise</button>
+          <button className="aw-btn-primary" onClick={() => { onGetStarted(); setMobileMenuOpen(false) }} style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}>Login / Sign Up →</button>
+        </div>
+      )}
+      {mobileMenuOpen && <div onClick={() => setMobileMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />}
 
       {/* ─── HERO ─── */}
       <div id="hero" style={{ background: 'var(--black)', borderBottom: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
@@ -218,7 +229,7 @@ export default function LandingPage({ onGetStarted }) {
         <section>
           <div className="aw-label aw-reveal">Who It's For</div>
           <h2 className="aw-title aw-reveal">Built for <span>Both Sides</span></h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '40px' }}>
+          <div className="aw-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '40px' }}>
             {[
               {
                 emoji: '🏢', title: 'Advertisers', color: 'rgba(255,208,0,0.08)', border: 'rgba(255,208,0,0.15)',
@@ -300,7 +311,7 @@ export default function LandingPage({ onGetStarted }) {
           <h2 className="aw-title aw-reveal">Big Brand? <span style={{ color: 'var(--purple)' }}>Let's Talk.</span></h2>
           <p className="aw-reveal" style={{ color: 'rgba(245,240,232,0.4)', marginBottom: '56px', maxWidth: '500px', lineHeight: 1.6 }}>25+ rickshaws, both cities, dedicated account manager. We'll build a custom plan around your goals and call you within 2 hours.</p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '56px', alignItems: 'start' }}>
+          <div className="aw-grid-2 aw-grid-2-gap" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '56px', alignItems: 'start' }}>
             {/* Perks */}
             <div className="aw-reveal" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {[
@@ -378,7 +389,7 @@ export default function LandingPage({ onGetStarted }) {
         <section>
           <div className="aw-label aw-reveal">Join AdWheels</div>
           <h2 className="aw-title aw-reveal">Register <span>Right Now</span></h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '72px', alignItems: 'start', marginTop: '48px' }}>
+          <div className="aw-grid-2 aw-grid-2-gap" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '72px', alignItems: 'start', marginTop: '48px' }}>
             {/* Info */}
             <div className="aw-reveal">
               <h3 style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: '1.3rem', marginBottom: '16px' }}>Be a Founding Member 🚀</h3>
