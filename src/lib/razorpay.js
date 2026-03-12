@@ -37,30 +37,39 @@ export async function openRazorpayCheckout({ amount, campaignId, planName, profi
     name: 'AdWheels',
     description: `${planName} Campaign — 1 month`,
     handler: async function (response) {
-      // Step 1 (critical): mark campaign as paid.
-      // We chain .select('id') so Supabase returns the updated rows — an empty
-      // array means the update was silently blocked (e.g. missing RLS UPDATE
-      // policy) rather than a real DB error.  After running the migration in
-      // supabase/migrations/ this should always succeed for the campaign owner.
-      const { data: updated, error: statusError } = await supabase
-        .from('campaigns')
-        .update({ status: 'paid' })
-        .eq('id', campaignId)
-        .select('id')
+      // Call the confirm-payment Edge Function which uses the Supabase service
+      // role key to update status = 'paid', bypassing any RLS policy gaps.
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-payment`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              campaignId,
+              razorpay_payment_id: response.razorpay_payment_id,
+            }),
+          }
+        )
 
-      if (statusError || !updated || updated.length === 0) {
-        const msg = statusError?.message || 'Permission denied — campaign status could not be updated.'
-        console.error('Failed to update campaign status after payment:', msg)
-        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign status. Please contact support.`)
+        const result = await res.json()
+
+        if (!res.ok || result.error) {
+          const msg = result.error || 'Could not update campaign status.'
+          console.error('confirm-payment failed:', msg)
+          if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign. Please contact support.`)
+          return
+        }
+      } catch (err) {
+        console.error('confirm-payment network error:', err)
+        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not reach the server. Please contact support.`)
         return
       }
-
-      // Step 2 (best-effort): store the Razorpay payment ID for reference.
-      // Silently skipped if the razorpay_payment_id column does not yet exist.
-      await supabase
-        .from('campaigns')
-        .update({ razorpay_payment_id: response.razorpay_payment_id })
-        .eq('id', campaignId)
 
       if (onSuccess) onSuccess(response)
     },
