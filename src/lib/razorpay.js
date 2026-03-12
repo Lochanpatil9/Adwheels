@@ -37,19 +37,26 @@ export async function openRazorpayCheckout({ amount, campaignId, planName, profi
     name: 'AdWheels',
     description: `${planName} Campaign — 1 month`,
     handler: async function (response) {
-      // Step 1 (critical): mark campaign as paid
-      const { error: statusError } = await supabase
+      // Step 1 (critical): mark campaign as paid.
+      // We chain .select('id') so Supabase returns the updated rows — an empty
+      // array means the update was silently blocked (e.g. missing RLS UPDATE
+      // policy) rather than a real DB error.  After running the migration in
+      // supabase/migrations/ this should always succeed for the campaign owner.
+      const { data: updated, error: statusError } = await supabase
         .from('campaigns')
         .update({ status: 'paid' })
         .eq('id', campaignId)
+        .select('id')
 
-      if (statusError) {
-        console.error('Failed to update campaign status after payment:', statusError.message)
-        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign. Please contact support.`)
+      if (statusError || !updated || updated.length === 0) {
+        const msg = statusError?.message || 'Permission denied — campaign status could not be updated.'
+        console.error('Failed to update campaign status after payment:', msg)
+        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign status. Please contact support.`)
         return
       }
 
-      // Step 2 (best-effort): store the Razorpay payment ID for reference
+      // Step 2 (best-effort): store the Razorpay payment ID for reference.
+      // Silently skipped if the razorpay_payment_id column does not yet exist.
       await supabase
         .from('campaigns')
         .update({ razorpay_payment_id: response.razorpay_payment_id })

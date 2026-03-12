@@ -249,8 +249,11 @@ export default function AdvertiserDashboard({ profile }) {
         fetchCampaigns()
       },
       onFailure: (msg) => {
-        if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.')
-        else toast('Campaign saved. Complete payment anytime from My Campaigns.', { icon: 'ℹ️' })
+        if (msg === 'Payment cancelled.') {
+          toast('Campaign saved. Complete payment anytime from My Campaigns.', { icon: 'ℹ️' })
+        } else {
+          toast.error(msg || 'Payment failed.')
+        }
         setTab('campaigns')
         fetchCampaigns()
       },

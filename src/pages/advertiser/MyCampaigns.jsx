@@ -39,6 +39,17 @@ export default function MyCampaigns() {
     setLoading(false)
   }
 
+  function handlePayment(campaign) {
+    openRazorpayCheckout({
+      amount: campaign.plans?.price,
+      campaignId: campaign.id,
+      planName: campaign.plans?.name,
+      profile,
+      onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+      onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
+    })
+  }
+
   const filtered = filter === 'all' ? campaigns : campaigns.filter(c => c.status === filter)
 
   return (
@@ -103,16 +114,7 @@ export default function MyCampaigns() {
                   ₹{c.plans?.price?.toLocaleString()}<span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'DM Sans' }}>/mo</span>
                 </span>
                 {c.status === 'pending' && (
-                  <button className="btn btn-yellow btn-sm" onClick={() =>
-                    openRazorpayCheckout({
-                      amount: c.plans?.price,
-                      campaignId: c.id,
-                      planName: c.plans?.name,
-                      profile,
-                      onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
-                      onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
-                    })
-                  }>Pay Now →</button>
+                  <button className="btn btn-yellow btn-sm" onClick={() => handlePayment(c)}>Pay Now →</button>
                 )}
                 {c.status === 'active' && c.plans?.has_live_tracking && (
                   <button className="btn btn-green btn-sm">📍 Live Track</button>

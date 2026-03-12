@@ -82,9 +82,12 @@ export default function CreateCampaign() {
           navigate('/advertiser/campaigns')
         },
         onFailure: (msg) => {
-          if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.')
-          else toast('Campaign saved. Complete payment anytime from My Campaigns.', { icon: 'ℹ️' })
-          navigate('/advertiser/campaigns')
+          if (msg === 'Payment cancelled.') {
+            toast('Campaign saved. Complete payment anytime from My Campaigns.', { icon: 'ℹ️' })
+            navigate('/advertiser/campaigns')
+          } else {
+            toast.error(msg || 'Payment failed.')
+          }
         },
       })
     } catch (err) {
