@@ -186,6 +186,7 @@ export default function AdvertiserDashboard({ profile }) {
   const [form, setForm] = useState({ company_name:'', city:'', area:'' })
   const [submitting, setSubmitting] = useState(false)
   const [analyticsFor, setAnalyticsFor] = useState(null)
+  const [payingId, setPayingId] = useState(null)
 
   useEffect(() => { fetchCampaigns() }, [])
 
@@ -197,6 +198,57 @@ export default function AdvertiserDashboard({ profile }) {
       .order('created_at', { ascending: false })
     setCampaigns(data || [])
     setLoading(false)
+  }
+
+  function loadRazorpay() {
+    return new Promise(resolve => {
+      if (window.Razorpay) { resolve(true); return }
+      const script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.onload = () => resolve(true)
+      script.onerror = () => resolve(false)
+      document.body.appendChild(script)
+    })
+  }
+
+  async function handlePayment(campaign) {
+    setPayingId(campaign.id)
+    const loaded = await loadRazorpay()
+    if (!loaded) {
+      toast.error('Payment gateway failed to load. Please try again.')
+      setPayingId(null)
+      return
+    }
+
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: campaign.plans.price * 100,
+      currency: 'INR',
+      name: 'AdWheels',
+      description: `${campaign.plans.name} Plan — ${campaign.city}`,
+      handler: async function (response) {
+        const { error } = await supabase
+          .from('campaigns').update({ status: 'paid' }).eq('id', campaign.id)
+        if (error) {
+          toast.error('Payment recorded but status update failed. Contact support.')
+          return
+        }
+        await supabase.rpc('auto_assign_drivers', { campaign_id: campaign.id })
+        toast.success('Payment successful! 🎉 Drivers are being assigned — go live in 90 min.')
+        fetchCampaigns()
+        setTab('campaigns')
+      },
+      prefill: { name: profile.full_name, contact: profile.phone },
+      theme: { color: '#FFD000' },
+      modal: { ondismiss: () => setPayingId(null) },
+    }
+
+    const rzp = new window.Razorpay(options)
+    rzp.on('payment.failed', function (response) {
+      toast.error('Payment failed: ' + response.error.description)
+      setPayingId(null)
+    })
+    rzp.open()
   }
 
   function handleBannerSelect(e) {
@@ -324,8 +376,16 @@ export default function AdvertiserDashboard({ profile }) {
                     </div>
                     {c.status === 'pending' && (
                       <div style={{padding:'12px',background:'rgba(255,208,0,0.08)',borderRadius:'8px',border:'1px solid rgba(255,208,0,0.2)'}}>
-                        <div style={{fontSize:'0.82rem',color:'var(--yellow)',fontWeight:600}}>⚠️ Payment pending — campaign not yet live</div>
-                        <div style={{fontSize:'0.78rem',color:'rgba(245,240,232,0.4)',marginTop:'4px'}}>Contact us on WhatsApp to activate manually.</div>
+                        <div style={{fontSize:'0.82rem',color:'var(--yellow)',fontWeight:600,marginBottom:'10px'}}>
+                          ⚠️ Payment pending — complete payment to go live in 90 minutes
+                        </div>
+                        <button
+                          style={{background:'var(--yellow)',color:'var(--black)',fontFamily:'Syne',fontSize:'0.85rem',fontWeight:800,padding:'10px 20px',border:'none',borderRadius:'6px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px'}}
+                          onClick={() => handlePayment(c)}
+                          disabled={payingId === c.id}
+                        >
+                          {payingId === c.id ? '⏳ Loading...' : `💳 Pay ₹${c.plans?.price?.toLocaleString()}`}
+                        </button>
                       </div>
                     )}
                     {(c.status === 'active' || c.status === 'paid') && (

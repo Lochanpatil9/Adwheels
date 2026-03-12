@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendWhatsApp } from '../lib/notify'
 import toast from 'react-hot-toast'
 import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus } from 'lucide-react'
 
@@ -143,8 +144,30 @@ export default function AdminDashboard({ profile }) {
 
   async function handleActivateCampaign(campaignId) {
     const { error } = await supabase.from('campaigns').update({ status: 'paid' }).eq('id', campaignId)
-    if (error) toast.error(error.message)
-    else { toast.success('Campaign marked as paid ✅'); fetchCampaigns() }
+    if (error) { toast.error(error.message); return }
+
+    const { error: rpcError } = await supabase.rpc('auto_assign_drivers', { campaign_id: campaignId })
+    const campaign = campaigns.find(c => c.id === campaignId)
+
+    if (!rpcError) {
+      if (campaign) {
+        // Fetch newly assigned driver jobs and notify each driver
+        const { data: driverJobs } = await supabase
+          .from('driver_jobs').select('driver_id').eq('campaign_id', campaignId).eq('status', 'offered')
+        if (driverJobs?.length) {
+          const assignedDrivers = drivers.filter(d => driverJobs.some(j => j.driver_id === d.id))
+          await Promise.all(assignedDrivers.map(d =>
+            sendWhatsApp(d.phone, `🛺 AdWheels: New job offer in ${campaign.city}! Open the app to accept.`)
+          ))
+        }
+        // Notify advertiser that campaign is active
+        await sendWhatsApp(campaign.users?.phone, `🎉 AdWheels: Your campaign "${campaign.company_name}" is now live! Drivers are being assigned.`)
+      }
+      toast.success('Campaign activated! Drivers assigned & notified 🎉')
+    } else {
+      toast.success('Campaign marked as paid ✅ — assign drivers manually')
+    }
+    fetchCampaigns()
   }
 
   async function handleAssignDriver(campaignId) {
@@ -157,6 +180,18 @@ export default function AdminDashboard({ profile }) {
     })
     if (error) { toast.error(error.message); return }
     await supabase.from('campaigns').update({ status: 'active' }).eq('id', campaignId)
+
+    // Notify driver about new job offer
+    const driver = drivers.find(d => d.id === selectedDriver)
+    const campaign = campaigns.find(c => c.id === campaignId)
+    if (driver?.phone) {
+      await sendWhatsApp(driver.phone, `🛺 AdWheels: New job offer in ${campaign?.city}! Open the app to accept.`)
+    }
+    // Notify advertiser that their campaign is now live
+    if (campaign?.users?.phone) {
+      await sendWhatsApp(campaign.users.phone, `🎉 AdWheels: Your campaign "${campaign.company_name}" is now live! Drivers are rolling.`)
+    }
+
     toast.success('Driver assigned! They will see the job offer 🎉')
     setAssigningJob(null)
     setSelectedDriver('')
@@ -185,10 +220,15 @@ export default function AdminDashboard({ profile }) {
   }
 
   async function handleProcessPayout(payoutId) {
+    const payout = payouts.find(p => p.id === payoutId)
     const { error } = await supabase.from('payouts')
       .update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', payoutId)
-    if (error) toast.error(error.message)
-    else { toast.success('Payout marked as paid 💸'); fetchPayouts() }
+    if (error) { toast.error(error.message); return }
+    if (payout?.users?.phone) {
+      await sendWhatsApp(payout.users.phone, `💰 AdWheels: ₹${payout.amount} has been sent to UPI ${payout.upi_id}. Check your account!`)
+    }
+    toast.success('Payout marked as paid 💸')
+    fetchPayouts()
   }
 
   async function handleVerifyDriver(driverId) {
