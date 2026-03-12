@@ -212,6 +212,11 @@ export default function AdvertiserDashboard({ profile }) {
   }
 
   async function handlePayment(campaign) {
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID
+    if (!razorpayKey) {
+      toast.error('Payment gateway not configured. Please contact support.')
+      return
+    }
     setPayingId(campaign.id)
     const loaded = await loadRazorpay()
     if (!loaded) {
@@ -221,22 +226,30 @@ export default function AdvertiserDashboard({ profile }) {
     }
 
     const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      key: razorpayKey,
       amount: campaign.plans.price * 100,
       currency: 'INR',
       name: 'AdWheels',
       description: `${campaign.plans.name} Plan — ${campaign.city}`,
       handler: async function (response) {
         const { error } = await supabase
-          .from('campaigns').update({ status: 'paid' }).eq('id', campaign.id)
+          .from('campaigns')
+          .update({ status: 'paid', razorpay_payment_id: response.razorpay_payment_id })
+          .eq('id', campaign.id)
         if (error) {
-          toast.error('Payment recorded but status update failed. Contact support.')
+          toast.error(`Payment received (ID: ${response.razorpay_payment_id}) but campaign update failed. Please contact support.`)
+          setPayingId(null)
           return
         }
-        await supabase.rpc('auto_assign_drivers', { campaign_id: campaign.id })
-        toast.success('Payment successful! 🎉 Drivers are being assigned — go live in 90 min.')
+        const { error: assignError } = await supabase.rpc('auto_assign_drivers', { campaign_id: campaign.id })
+        if (assignError) {
+          toast.error('Payment successful but driver assignment failed — our team will assign drivers shortly.')
+        } else {
+          toast.success('Payment successful! 🎉 Drivers are being assigned — go live in 90 min.')
+        }
         fetchCampaigns()
         setTab('campaigns')
+        setPayingId(null)
       },
       prefill: { name: profile.full_name, contact: profile.phone },
       theme: { color: '#FFD000' },
