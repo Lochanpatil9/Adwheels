@@ -1,9 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-
-const SUPABASE_URL = 'https://bdrghzrqnlkrzzwezbem.supabase.co'
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkcmdoenJxbmxrcnp6d2V6YmVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzg1ODcsImV4cCI6MjA4ODY1NDU4N30.LEdPFP3fFmMu_MnJy3_A5bHqBpH57nE_I3B8nM0IlIk'
+import { submitEnterpriseLead, submitRegistration } from '../lib/api'
 
 /* ─── Reveal on scroll hook ─── */
 function useReveal() {
@@ -59,40 +56,25 @@ export default function LandingPage({ onGetStarted }) {
     }
     setEntSubmitting(true)
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/enterprise_leads`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON,
-          'Authorization': `Bearer ${SUPABASE_ANON}`,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          full_name: entForm.name,
-          phone: entForm.phone,
-          email: entForm.email,
-          company_name: entForm.company,
-          city: entForm.city,
-          message: entForm.message,
-        })
-      })
-      if (res.ok || res.status === 201) {
-        setEntDone(true)
-        toast.success('Request sent! We\'ll call you within 2 hours 🎉')
-      } else {
-        throw new Error('Failed')
-      }
+      await submitEnterpriseLead(entForm)
+      setEntDone(true)
+      toast.success('Request sent! We\'ll call you within 2 hours 🎉')
     } catch {
       toast.error('Something went wrong. Please call us directly!')
     }
     setEntSubmitting(false)
   }
 
-  function submitRegister() {
+  async function submitRegister() {
     const { name, phone, city } = regForm
     if (!name || !phone || !city) { toast.error('Please fill name, phone, and city'); return }
-    setRegDone(true)
-    toast.success('Registered! Our team will call you within 24 hours 🎉')
+    try {
+      await submitRegistration({ ...regForm, role: activeTab })
+      setRegDone(true)
+      toast.success('Registered! Our team will call you within 24 hours 🎉')
+    } catch {
+      toast.error('Something went wrong. Please try again!')
+    }
   }
 
   return (
@@ -134,6 +116,23 @@ export default function LandingPage({ onGetStarted }) {
         @media (max-width: 768px) {
           section { padding: 64px 20px; }
           .aw-hide-mobile { display: none !important; }
+          .aw-mobile-menu { display: block !important; }
+          .aw-mobile-nav { display: flex !important; }
+          .aw-two-col { grid-template-columns: 1fr !important; gap: 32px !important; }
+        }
+        .aw-mobile-menu { display: none; }
+        .aw-mobile-nav {
+          display: none;
+          position: absolute;
+          top: 64px;
+          left: 0;
+          right: 0;
+          background: rgba(8,8,8,0.98);
+          border-bottom: 1px solid var(--border);
+          flex-direction: column;
+          padding: 20px 32px;
+          gap: 16px;
+          z-index: 99;
         }
       `}</style>
 
@@ -147,7 +146,16 @@ export default function LandingPage({ onGetStarted }) {
           <button className="aw-nav-link" onClick={() => scrollTo('register')}>Drivers</button>
           <button className="aw-btn-primary" style={{ padding: '10px 22px', fontSize: '0.85rem' }} onClick={onGetStarted}>Login / Sign Up</button>
         </div>
-        <button style={{ background: 'none', border: 'none', color: '#F5F0E8', cursor: 'pointer', fontSize: '1.5rem', display: 'none' }} className="aw-mobile-menu">☰</button>
+        <button className="aw-mobile-menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} style={{ background: 'none', border: 'none', color: '#F5F0E8', cursor: 'pointer', fontSize: '1.5rem' }}>{mobileMenuOpen ? '✕' : '☰'}</button>
+        {mobileMenuOpen && (
+          <div className="aw-mobile-nav">
+            <button className="aw-nav-link" onClick={() => { scrollTo('how'); setMobileMenuOpen(false) }}>How It Works</button>
+            <button className="aw-nav-link" onClick={() => { scrollTo('pricing'); setMobileMenuOpen(false) }}>Pricing</button>
+            <button className="aw-nav-link" onClick={() => { scrollTo('enterprise'); setMobileMenuOpen(false) }} style={{ color: 'var(--purple)' }}>Enterprise</button>
+            <button className="aw-nav-link" onClick={() => { scrollTo('register'); setMobileMenuOpen(false) }}>Drivers</button>
+            <button className="aw-btn-primary" style={{ padding: '10px 22px', fontSize: '0.85rem', width: '100%', justifyContent: 'center' }} onClick={() => { setMobileMenuOpen(false); onGetStarted() }}>Login / Sign Up</button>
+          </div>
+        )}
       </nav>
 
       {/* ─── HERO ─── */}
@@ -184,8 +192,8 @@ export default function LandingPage({ onGetStarted }) {
           <div className="marquee-track">
             {[...Array(2)].map((_, i) => (
               <div key={i} style={{ display: 'flex', gap: '0', flexShrink: 0 }}>
-                {['🛺 Live in 90 Minutes', '📍 Indore & Bhopal', '💰 From ₹1,500/mo', '📸 Daily Proof Photos', '✅ Verified Drivers', '🎯 Hyperlocal Targeting', '🛺 Live in 90 Minutes', '📍 Indore & Bhopal', '💰 From ₹1,500/mo', '📸 Daily Proof Photos', '✅ Verified Drivers', '🎯 Hyperlocal Targeting'].map(t => (
-                  <span key={t} style={{ padding: '0 32px', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(245,240,232,0.4)', whiteSpace: 'nowrap' }}>{t}</span>
+                {['🛺 Live in 90 Minutes', '📍 Indore & Bhopal', '💰 From ₹1,500/mo', '📸 Daily Proof Photos', '✅ Verified Drivers', '🎯 Hyperlocal Targeting', '🛺 Live in 90 Minutes', '📍 Indore & Bhopal', '💰 From ₹1,500/mo', '📸 Daily Proof Photos', '✅ Verified Drivers', '🎯 Hyperlocal Targeting'].map((t, idx) => (
+                  <span key={`${t}-${idx}`} style={{ padding: '0 32px', fontSize: '0.82rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(245,240,232,0.4)', whiteSpace: 'nowrap' }}>{t}</span>
                 ))}
               </div>
             ))}
@@ -218,7 +226,7 @@ export default function LandingPage({ onGetStarted }) {
         <section>
           <div className="aw-label aw-reveal">Who It's For</div>
           <h2 className="aw-title aw-reveal">Built for <span>Both Sides</span></h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '40px' }}>
+          <div className="aw-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '40px' }}>
             {[
               {
                 emoji: '🏢', title: 'Advertisers', color: 'rgba(255,208,0,0.08)', border: 'rgba(255,208,0,0.15)',
@@ -300,7 +308,7 @@ export default function LandingPage({ onGetStarted }) {
           <h2 className="aw-title aw-reveal">Big Brand? <span style={{ color: 'var(--purple)' }}>Let's Talk.</span></h2>
           <p className="aw-reveal" style={{ color: 'rgba(245,240,232,0.4)', marginBottom: '56px', maxWidth: '500px', lineHeight: 1.6 }}>25+ rickshaws, both cities, dedicated account manager. We'll build a custom plan around your goals and call you within 2 hours.</p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '56px', alignItems: 'start' }}>
+          <div className="aw-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '56px', alignItems: 'start' }}>
             {/* Perks */}
             <div className="aw-reveal" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {[
@@ -378,7 +386,7 @@ export default function LandingPage({ onGetStarted }) {
         <section>
           <div className="aw-label aw-reveal">Join AdWheels</div>
           <h2 className="aw-title aw-reveal">Register <span>Right Now</span></h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '72px', alignItems: 'start', marginTop: '48px' }}>
+          <div className="aw-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '72px', alignItems: 'start', marginTop: '48px' }}>
             {/* Info */}
             <div className="aw-reveal">
               <h3 style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: '1.3rem', marginBottom: '16px' }}>Be a Founding Member 🚀</h3>

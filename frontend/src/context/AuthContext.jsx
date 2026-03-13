@@ -1,25 +1,30 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import toast from 'react-hot-toast'
 
-// 🎓 LESSON: Context = a global variable the whole app can read
-// Instead of passing user data to every component, we store it here once
 const AuthContext = createContext({})
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)       // Supabase auth user
-  const [profile, setProfile] = useState(null) // Our users table row
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isPasswordReset, setIsPasswordReset] = useState(false)
 
   useEffect(() => {
-    // Check if user is already logged in when app loads
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) fetchProfile(session.user.id)
       else setLoading(false)
     })
 
-    // Listen for login/logout events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordReset(true)
+        setUser(session?.user ?? null)
+        setLoading(false)
+        return
+      }
+      setIsPasswordReset(false)
       setUser(session?.user ?? null)
       if (session?.user) fetchProfile(session.user.id)
       else { setProfile(null); setLoading(false) }
@@ -29,12 +34,17 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
       .single()
-    setProfile(data)
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Failed to fetch profile:', error)
+      toast.error('Failed to load profile. Please try again.')
+    }
+    setProfile(data || null)
     setLoading(false)
   }
 
@@ -43,11 +53,10 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, fetchProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, isPasswordReset, signOut, fetchProfile }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-// Custom hook - any component can call useAuth() to get user info
 export const useAuth = () => useContext(AuthContext)

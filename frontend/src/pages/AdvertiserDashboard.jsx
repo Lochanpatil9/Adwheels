@@ -202,6 +202,7 @@ export default function AdvertiserDashboard({ profile }) {
   function handleBannerSelect(e) {
     const file = e.target.files[0]
     if (!file) return
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview)
     setBannerFile(file)
     setBannerPreview(URL.createObjectURL(file))
   }
@@ -235,7 +236,9 @@ export default function AdvertiserDashboard({ profile }) {
     toast.success('Campaign created! 🎉 Complete payment to go live.')
     setTab('campaigns')
     fetchCampaigns()
-    setSelectedPlan(null); setBannerFile(null); setBannerPreview(null)
+    setSelectedPlan(null); setBannerFile(null)
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview)
+    setBannerPreview(null)
     setForm({ company_name:'', city:'', area:'' })
     setSubmitting(false)
   }

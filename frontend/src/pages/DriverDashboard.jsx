@@ -58,12 +58,14 @@ export default function DriverDashboard({ profile }) {
   const [todayProof, setTodayProof] = useState(null)
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutLoading, setPayoutLoading] = useState(false)
+  const [totalPaidOut, setTotalPaidOut] = useState(0)
 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
     await fetchJobs()
     await fetchEarnings()
+    await fetchPayouts()
   }
 
   async function fetchJobs() {
@@ -111,21 +113,29 @@ export default function DriverDashboard({ profile }) {
     setMonthEarnings(all.filter(e => e.earning_date?.startsWith(thisMonth)).reduce((sum, e) => sum + e.amount, 0))
   }
 
-  async function handleAcceptJob(jobId) {
-  const { error } = await supabase
-    .from('driver_jobs')
-    .update({ status: 'active', accepted_at: new Date().toISOString() })
-    .eq('id', jobId)
-    .eq('driver_id', profile.id)
+  async function fetchPayouts() {
+    const { data } = await supabase
+      .from('payouts')
+      .select('amount, status')
+      .eq('driver_id', profile.id)
+      .in('status', ['paid', 'requested'])
+    setTotalPaidOut((data || []).reduce((sum, p) => sum + p.amount, 0))
+  }
 
-  if (error) { toast.error(error.message); console.error(error); return }
-  toast.success('Job accepted! 🎉 Print the banner and install it.')
-  
-  // Force refresh jobs from DB
-  await fetchJobs()
-  await fetchEarnings()
-  setTab('proof')
-}
+  async function handleAcceptJob(jobId) {
+    const { error } = await supabase
+      .from('driver_jobs')
+      .update({ status: 'active', accepted_at: new Date().toISOString() })
+      .eq('id', jobId)
+      .eq('driver_id', profile.id)
+
+    if (error) { toast.error(error.message); console.error(error); return }
+    toast.success('Job accepted! 🎉 Print the banner and install it.')
+
+    await fetchJobs()
+    await fetchEarnings()
+    setTab('proof')
+  }
 
   async function handleRejectJob(jobId) {
     const { error } = await supabase
@@ -141,6 +151,7 @@ export default function DriverDashboard({ profile }) {
   function handleProofSelect(e) {
     const file = e.target.files[0]
     if (!file) return
+    if (proofPreview) URL.revokeObjectURL(proofPreview)
     setProofFile(file)
     setProofPreview(URL.createObjectURL(file))
   }
@@ -180,6 +191,7 @@ export default function DriverDashboard({ profile }) {
     }
 
     toast.success("Proof submitted! ✅ Admin will review and credit your earning.")
+    if (proofPreview) URL.revokeObjectURL(proofPreview)
     setProofFile(null)
     setProofPreview(null)
     await fetchAll()
@@ -189,7 +201,7 @@ export default function DriverDashboard({ profile }) {
   async function handleRequestPayout() {
     const amount = parseInt(payoutAmount)
     if (!amount || amount < 500) return toast.error('Minimum payout is ₹500')
-    if (amount > totalEarnings) return toast.error('Amount exceeds your balance')
+    if (amount > totalEarnings - totalPaidOut) return toast.error('Amount exceeds your available balance')
     if (!profile.upi_id) return toast.error('Please add your UPI ID — contact admin')
     setPayoutLoading(true)
     const { error } = await supabase.from('payouts').insert({
@@ -199,7 +211,7 @@ export default function DriverDashboard({ profile }) {
       status: 'requested'
     })
     if (error) toast.error(error.message)
-    else { toast.success('Payout requested! 💸 Will be processed in 1-2 days.'); setPayoutAmount('') }
+    else { toast.success('Payout requested! 💸 Will be processed in 1-2 days.'); setPayoutAmount(''); fetchPayouts() }
     setPayoutLoading(false)
   }
 
@@ -429,7 +441,7 @@ export default function DriverDashboard({ profile }) {
         {tab === 'payout' && <>
           <div style={{background:'linear-gradient(135deg,#001a0a,#002d12)', border:'1.5px solid rgba(0,230,118,0.2)', borderRadius:'16px', padding:'28px', marginBottom:'24px'}}>
             <div style={{fontSize:'0.78rem', fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(0,230,118,0.6)', marginBottom:'6px'}}>Available Balance</div>
-            <div style={{fontFamily:'Bebas Neue', fontSize:'3.5rem', color:'var(--green)', lineHeight:1, marginBottom:'4px'}}>₹{totalEarnings}</div>
+            <div style={{fontFamily:'Bebas Neue', fontSize:'3.5rem', color:'var(--green)', lineHeight:1, marginBottom:'4px'}}>₹{totalEarnings - totalPaidOut}</div>
             <div style={{fontSize:'0.82rem', color:'rgba(245,240,232,0.4)'}}>UPI: {profile.upi_id || 'Not set — contact admin to update'}</div>
           </div>
 

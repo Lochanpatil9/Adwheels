@@ -24,7 +24,7 @@ const styles = {
   select: { width:'100%', background:'rgba(245,240,232,0.04)', border:'1.5px solid rgba(245,240,232,0.09)', borderRadius:'8px', padding:'13px 15px', color:'var(--white)', fontSize:'0.93rem', outline:'none', marginBottom:'16px', WebkitAppearance:'none' },
 }
 
-export default function AuthPage() {
+export default function AuthPage({ setupMode, userId } = {}) {
   const [mode, setMode] = useState('login')
   const [role, setRole] = useState('advertiser')
   const [loading, setLoading] = useState(false)
@@ -43,7 +43,7 @@ export default function AuthPage() {
   async function handleForgotPassword() {
     if (!form.email) return toast.error('Enter your email address first')
     const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
-      redirectTo: 'http://localhost:5173'
+      redirectTo: `${window.location.origin}/reset-password`
     })
     if (error) toast.error(error.message)
     else toast.success('Password reset email sent! Check your inbox 📧')
@@ -119,7 +119,7 @@ export default function AuthPage() {
           <input style={styles.input} placeholder="Your full name" value={form.full_name} onChange={e => updateForm('full_name', e.target.value)} />
 
           <label style={styles.label}>Phone Number *</label>
-          <input style={styles.input} placeholder="+91 XXXXX XXXXX" value={form.phone} onChange={e => updateForm('phone', e.target.value)} />
+          <input style={styles.input} type="tel" placeholder="+91 XXXXX XXXXX" value={form.phone} onChange={e => updateForm('phone', e.target.value)} />
 
           <label style={styles.label}>City *</label>
           <select style={styles.select} value={form.city} onChange={e => updateForm('city', e.target.value)}>
