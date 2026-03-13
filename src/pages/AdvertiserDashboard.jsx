@@ -326,7 +326,7 @@ export default function AdvertiserDashboard({ profile }) {
                           campaignId: c.id,
                           planName: c.plans?.name,
                           profile,
-                          onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+                          onSuccess: () => { toast.success('Payment successful! Drivers being assigned 🎉'); fetchCampaigns() },
                           onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
                         })}
                       >
@@ -367,7 +367,7 @@ export default function AdvertiserDashboard({ profile }) {
                             campaignId: c.id,
                             planName: c.plans?.name,
                             profile,
-                            onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+                            onSuccess: () => { toast.success('Payment successful! Drivers being assigned 🎉'); fetchCampaigns() },
                             onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
                           })}
                         >
