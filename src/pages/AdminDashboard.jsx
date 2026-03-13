@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendWhatsApp } from '../lib/notify'
 import toast from 'react-hot-toast'
 import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus } from 'lucide-react'
 
@@ -158,6 +159,20 @@ export default function AdminDashboard({ profile }) {
     if (error) { toast.error(error.message); return }
     await supabase.from('campaigns').update({ status: 'active' }).eq('id', campaignId)
     toast.success('Driver assigned! They will see the job offer 🎉')
+
+    // WhatsApp: Notify driver of job offer
+    const campaign = campaigns.find(c => c.id === campaignId)
+    const driver = drivers.find(d => d.id === selectedDriver)
+    if (driver?.phone && campaign) {
+      sendWhatsApp(driver.phone, `🛺 New Ad Job! ${campaign.users?.full_name || campaign.company_name || 'A company'} wants you for their campaign in ${campaign.city}. Open AdWheels to accept. Fast — first come first serve!`)
+    }
+
+    // WhatsApp: Notify advertiser that campaign is now active
+    if (campaign?.users?.phone) {
+      const companyName = campaign.company_name || campaign.users?.full_name || 'Your'
+      sendWhatsApp(campaign.users.phone, `🎉 Your ad is LIVE! ${companyName} campaign is now rolling on ${campaign.plans?.rickshaw_count || 1} rickshaws in ${campaign.city}. Check your dashboard for live updates.`)
+    }
+
     setAssigningJob(null)
     setSelectedDriver('')
     fetchCampaigns()
@@ -174,6 +189,13 @@ export default function AdminDashboard({ profile }) {
       amount: dailyAmount, earning_date: today, type: 'daily'
     })
     toast.success(`✅ Proof approved + ₹${dailyAmount} earning added`)
+
+    // WhatsApp: Notify driver that proof was approved
+    const driver = drivers.find(d => d.id === driverId)
+    if (driver?.phone) {
+      sendWhatsApp(driver.phone, `✅ Proof approved! ₹${dailyAmount} has been credited to your AdWheels earnings for today.`)
+    }
+
     fetchProofs()
   }
 
@@ -187,8 +209,16 @@ export default function AdminDashboard({ profile }) {
   async function handleProcessPayout(payoutId) {
     const { error } = await supabase.from('payouts')
       .update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', payoutId)
-    if (error) toast.error(error.message)
-    else { toast.success('Payout marked as paid 💸'); fetchPayouts() }
+    if (error) { toast.error(error.message); return }
+    toast.success('Payout marked as paid 💸')
+
+    // WhatsApp: Notify driver that payout was sent
+    const payout = payouts.find(p => p.id === payoutId)
+    if (payout?.users?.phone) {
+      sendWhatsApp(payout.users.phone, `💰 Payout sent! ₹${payout.amount} has been sent to your UPI ${payout.upi_id || 'account'}. Should reflect within 24 hours.`)
+    }
+
+    fetchPayouts()
   }
 
   async function handleVerifyDriver(driverId) {
