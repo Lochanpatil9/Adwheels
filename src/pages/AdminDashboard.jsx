@@ -164,13 +164,13 @@ export default function AdminDashboard({ profile }) {
     const campaign = campaigns.find(c => c.id === campaignId)
     const driver = drivers.find(d => d.id === selectedDriver)
     if (driver?.phone && campaign) {
-      sendWhatsApp(driver.phone, `🛺 New Ad Job! ${campaign.users?.full_name || campaign.company_name || 'A company'} wants you for their campaign in ${campaign.city}. Open AdWheels to accept. Fast — first come first serve!`)
+      sendWhatsApp(driver.phone, `🛺 New Ad Job! ${campaign.users?.full_name || campaign.company_name || 'A company'} wants you for their campaign in ${campaign.city || 'your city'}. Open AdWheels to accept. Fast — first come first serve!`)
     }
 
     // WhatsApp: Notify advertiser that campaign is now active
     if (campaign?.users?.phone) {
       const companyName = campaign.company_name || campaign.users?.full_name || 'Your'
-      sendWhatsApp(campaign.users.phone, `🎉 Your ad is LIVE! ${companyName} campaign is now rolling on ${campaign.plans?.rickshaw_count || 1} rickshaws in ${campaign.city}. Check your dashboard for live updates.`)
+      sendWhatsApp(campaign.users.phone, `🎉 Your ad is LIVE! ${companyName} campaign is now rolling on ${campaign.plans?.rickshaw_count || 1} rickshaws in ${campaign.city || 'your city'}. Check your dashboard for live updates.`)
     }
 
     setAssigningJob(null)
