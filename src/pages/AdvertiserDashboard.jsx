@@ -244,7 +244,7 @@ export default function AdvertiserDashboard({ profile }) {
       planName: selectedPlan.name,
       profile,
       onSuccess: () => {
-        toast.success('Payment successful! 🎉 Your campaign has been activated.')
+        toast.success('Payment successful! Drivers being assigned 🎉')
         setTab('campaigns')
         fetchCampaigns()
       },

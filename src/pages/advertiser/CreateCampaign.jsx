@@ -78,7 +78,7 @@ export default function CreateCampaign() {
         planName: selectedPlan.name,
         profile,
         onSuccess: () => {
-          toast.success('Payment successful! 🎉 Your campaign has been activated.')
+          toast.success('Payment successful! Drivers being assigned 🎉')
           navigate('/advertiser/campaigns')
         },
         onFailure: (msg) => {

@@ -37,38 +37,25 @@ export async function openRazorpayCheckout({ amount, campaignId, planName, profi
     name: 'AdWheels',
     description: `${planName} Campaign — 1 month`,
     handler: async function (response) {
-      // Call the confirm-payment Edge Function which uses the Supabase service
-      // role key to update status = 'paid', bypassing any RLS policy gaps.
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-payment`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              campaignId,
-              razorpay_payment_id: response.razorpay_payment_id,
-            }),
-          }
-        )
+      // Step 1: mark the campaign as paid
+      const { error: updateError } = await supabase
+        .from('campaigns')
+        .update({ status: 'paid' })
+        .eq('id', campaignId)
 
-        const result = await res.json()
-
-        if (!res.ok || result.error) {
-          const msg = result.error || 'Could not update campaign status.'
-          console.error('confirm-payment failed:', msg)
-          if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign. Please contact support.`)
-          return
-        }
-      } catch (err) {
-        console.error('confirm-payment network error:', err)
-        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not reach the server. Please contact support.`)
+      if (updateError) {
+        console.error('Failed to mark campaign as paid:', updateError.message)
+        if (onFailure) onFailure(`Payment was successful (ID: ${response.razorpay_payment_id}) but we could not update your campaign. Please contact support.`)
         return
+      }
+
+      // Step 2: auto-assign available drivers to this campaign
+      const { error: rpcError } = await supabase
+        .rpc('auto_assign_drivers', { campaign_id: campaignId })
+
+      if (rpcError) {
+        // Non-fatal: drivers can still be assigned manually by admin
+        console.warn('auto_assign_drivers RPC error:', rpcError.message)
       }
 
       if (onSuccess) onSuccess(response)

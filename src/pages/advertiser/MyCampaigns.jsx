@@ -45,7 +45,7 @@ export default function MyCampaigns() {
       campaignId: campaign.id,
       planName: campaign.plans?.name,
       profile,
-      onSuccess: () => { toast.success('Payment successful! 🎉 Campaign activated.'); fetchCampaigns() },
+      onSuccess: () => { toast.success('Payment successful! Drivers being assigned 🎉'); fetchCampaigns() },
       onFailure: (msg) => { if (msg !== 'Payment cancelled.') toast.error(msg || 'Payment failed.') },
     })
   }

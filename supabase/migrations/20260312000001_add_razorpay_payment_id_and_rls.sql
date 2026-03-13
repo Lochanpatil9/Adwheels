@@ -1,4 +1,4 @@
--- Migration: Add razorpay_payment_id column and RLS policy for advertiser payments
+-- Migration: Add razorpay_payment_id column, RLS policy, and auto_assign_drivers function
 --
 -- ROOT CAUSE: After a successful Razorpay payment the campaign was not being
 -- marked as paid because:
@@ -33,3 +33,69 @@ CREATE POLICY "Advertisers can mark own campaigns as paid"
   TO authenticated
   USING  (advertiser_id = auth.uid() AND status = 'pending')
   WITH CHECK (advertiser_id = auth.uid() AND status = 'paid');
+
+-- ── 3. auto_assign_drivers: assign available verified drivers to a paid campaign ─
+--
+-- Called by the client immediately after marking a campaign as paid.
+-- Picks drivers in the same city as the campaign, up to the plan's rickshaw_count,
+-- skipping any driver already assigned to an active campaign.
+-- Creates a driver_jobs row for each assigned driver and updates campaigns.status
+-- to 'active' once at least one driver is assigned.
+
+CREATE OR REPLACE FUNCTION auto_assign_drivers(campaign_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER  -- runs as the DB owner so it can bypass RLS for internal assignments
+AS $$
+DECLARE
+  v_city           TEXT;
+  v_rickshaw_count INT;
+  v_driver         RECORD;
+  v_assigned       INT := 0;
+BEGIN
+  -- Fetch campaign details
+  SELECT c.city, p.rickshaw_count
+  INTO   v_city, v_rickshaw_count
+  FROM   campaigns c
+  JOIN   plans     p ON p.id = c.plan_id
+  WHERE  c.id = campaign_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Campaign % not found', campaign_id;
+  END IF;
+
+  -- Loop over available verified drivers in the same city
+  FOR v_driver IN
+    SELECT u.id
+    FROM   users u
+    WHERE  u.role        = 'driver'
+      AND  u.is_verified = TRUE
+      AND  u.city        = v_city
+      -- exclude drivers already assigned to a running campaign
+      AND  NOT EXISTS (
+             SELECT 1
+             FROM   driver_jobs dj
+             JOIN   campaigns   ca ON ca.id = dj.campaign_id
+             WHERE  dj.driver_id = u.id
+               AND  dj.status   != 'rejected'
+               AND  ca.status   IN ('paid', 'active')
+           )
+    LIMIT v_rickshaw_count
+  LOOP
+    INSERT INTO driver_jobs (driver_id, campaign_id, status)
+    VALUES (v_driver.id, campaign_id, 'active')
+    ON CONFLICT DO NOTHING;
+
+    v_assigned := v_assigned + 1;
+  END LOOP;
+
+  -- Promote campaign to 'active' if at least one driver was assigned
+  IF v_assigned > 0 THEN
+    UPDATE campaigns
+    SET    status    = 'active',
+           starts_at = NOW()
+    WHERE  id        = campaign_id;
+  END IF;
+END;
+$$;
+
