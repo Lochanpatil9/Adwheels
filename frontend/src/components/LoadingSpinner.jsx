@@ -1,8 +1,9 @@
-export default function LoadingSpinner() {
+import RickshawLoader from './RickshawLoader'
+
+export default function LoadingSpinner({ label = 'Loading…' }) {
   return (
     <div className="loading-screen">
-      <div className="loading-logo">AdWheels</div>
-      <div className="loading-spinner" />
+      <RickshawLoader size="md" label={label} />
     </div>
   )
 }

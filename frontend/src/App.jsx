@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ThemeProvider, useTheme } from './context/ThemeContext'
 import AdminDashboard from './pages/AdminDashboard'
 import AdvertiserDashboard from './pages/AdvertiserDashboard'
 import DriverDashboard from './pages/DriverDashboard'
@@ -18,12 +19,12 @@ function ProtectedRoute({ children }) {
 
 function DashboardRouter() {
   const { profile, user } = useAuth()
-
-  if (profile?.role === 'admin') return <AdminDashboard profile={profile} />
-  if (profile?.role === 'driver') return <DriverDashboard profile={profile} />
-  if (profile?.role === 'advertiser') return <AdvertiserDashboard profile={profile} />
-
-  return <AuthPage setupMode={true} userId={user?.id} />
+  if (!profile) return <LoadingSpinner label="Setting up your account…" />
+  if (profile.role === 'admin') return <AdminDashboard profile={profile} />
+  if (profile.role === 'driver') return <DriverDashboard profile={profile} />
+  if (profile.role === 'advertiser') return <AdvertiserDashboard profile={profile} />
+  // No role yet — show setup (setup mode)
+  return <AuthPage setupMode userId={user?.id} />
 }
 
 function AppRoutes() {
@@ -35,31 +36,57 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage onGetStarted={() => navigate('/auth')} />} />
-      <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+      <Route
+        path="/"
+        element={user ? <Navigate to="/dashboard" replace /> : <LandingPage onGetStarted={() => navigate('/auth')} />}
+      />
+      <Route
+        path="/auth"
+        element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />}
+      />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+      <Route
+        path="/dashboard"
+        element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>}
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
 
+function ToasterWithTheme() {
+  const { theme } = useTheme()
+  return (
+    <Toaster
+      position="top-center"
+      toastOptions={{
+        style: {
+          background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+          color: theme === 'dark' ? '#f5f0e8' : '#1A1814',
+          border: theme === 'dark'
+            ? '1px solid rgba(245,240,232,0.1)'
+            : '1px solid rgba(26,24,20,0.12)',
+          boxShadow: theme === 'dark'
+            ? '0 8px 24px rgba(0,0,0,0.4)'
+            : '0 4px 16px rgba(0,0,0,0.1)',
+          borderRadius: '10px',
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: '0.92rem',
+        },
+      }}
+    />
+  )
+}
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: '#1a1a1a',
-              color: '#f5f0e8',
-              border: '1px solid rgba(245,240,232,0.1)',
-            },
-          }}
-        />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+          <ToasterWithTheme />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
