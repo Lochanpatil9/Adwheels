@@ -2,6 +2,7 @@ import { Router } from 'express'
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
 import supabase from '../lib/supabase.js'
+import { sendNotification } from '../lib/notify.js'
 
 const router = Router()
 
@@ -73,6 +74,42 @@ router.post('/verify', async (req, res) => {
 
     if (rpcError) console.error('auto_assign_drivers error:', rpcError)
     // Don't throw — payment is verified, assignment failure is non-critical
+
+    // Step 4 — Set activated_at timestamp for duration tracking
+    const { error: activateErr } = await supabase
+      .from('campaigns')
+      .update({ status: 'active', activated_at: new Date().toISOString() })
+      .eq('id', campaignId)
+
+    if (activateErr) console.error('Failed to set activated_at:', activateErr)
+
+    // Step 5 — Notify drivers about their new job offer
+    try {
+      const { data: campaign } = await supabase
+        .from('campaigns')
+        .select('city, company_name')
+        .eq('id', campaignId)
+        .single()
+
+      const { data: driverJobs } = await supabase
+        .from('driver_jobs')
+        .select('driver_id')
+        .eq('campaign_id', campaignId)
+        .eq('status', 'offered')
+
+      if (driverJobs && driverJobs.length > 0) {
+        for (const job of driverJobs) {
+          await sendNotification(
+            job.driver_id,
+            'job_offer',
+            '🛺 New Job Offer!',
+            `You have a new ad campaign job in ${campaign?.city || 'your city'}. Open the Jobs tab to accept it and start earning!`
+          )
+        }
+      }
+    } catch (notifErr) {
+      console.error('Driver notification error:', notifErr.message)
+    }
 
     res.json({ success: true })
 

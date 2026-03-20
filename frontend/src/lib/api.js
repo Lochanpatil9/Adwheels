@@ -39,3 +39,38 @@ export async function verifyPayment(data) {
   if (!res.ok) throw new Error('Payment verification failed')
   return res.json()
 }
+
+export async function cancelCampaign(campaignId) {
+  const res = await fetch(`${API_BASE}/api/campaigns/${campaignId}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to cancel campaign')
+  }
+  return res.json()
+}
+
+export async function getCampaignStats(campaignId) {
+  const res = await fetch(`${API_BASE}/api/campaigns/${campaignId}/stats`)
+  if (!res.ok) throw new Error('Failed to fetch campaign stats')
+  return res.json()
+}
+
+export async function triggerExpiryCheck() {
+  const res = await fetch(`${API_BASE}/api/campaigns/expiry-check`)
+  if (!res.ok) throw new Error('Failed to trigger expiry check')
+  return res.json()
+}
+
+export async function sendNotification({ userId, type, title, message }) {
+  const res = await fetch(`${API_BASE}/api/notifications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, type, title, message }),
+  })
+  if (!res.ok) throw new Error('Failed to send notification')
+  return res.json()
+}
+
