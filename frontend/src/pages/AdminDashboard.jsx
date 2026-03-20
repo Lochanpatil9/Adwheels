@@ -89,6 +89,7 @@ export default function AdminDashboard({ profile }) {
   const [users, setUsers]       = useState([])
   const [assigningJob, setAssigningJob] = useState(null)
   const [selectedDriver, setSelectedDriver] = useState('')
+  const [busyDriverIds, setBusyDriverIds] = useState(new Set()) // drivers with active jobs
 
   useEffect(() => { fetchAll() }, [])
   async function fetchAll() { await Promise.all([fetchCampaigns(),fetchDrivers(),fetchProofs(),fetchPayouts(),fetchUsers()]) }
@@ -97,10 +98,21 @@ export default function AdminDashboard({ profile }) {
     const {data} = await supabase.from('campaigns').select('*, plans(name,price,rickshaw_count,driver_payout), users(full_name,phone,city)').order('created_at',{ascending:false})
     setCampaigns(data||[])
   }
+
   async function fetchDrivers() {
     const {data} = await supabase.from('users').select('*').eq('role','driver')
     setDrivers(data||[])
+
+    // fetch all active/offered driver_jobs to know who is busy
+    const {data: activeJobs} = await supabase
+      .from('driver_jobs')
+      .select('driver_id')
+      .in('status', ['offered', 'accepted', 'active'])
+
+    const busySet = new Set((activeJobs||[]).map(j => j.driver_id))
+    setBusyDriverIds(busySet)
   }
+
   async function fetchProofs() {
     const {data} = await supabase.from('daily_proofs').select('*, driver_id, users(full_name), driver_jobs(campaigns(city,area,plans(name,driver_payout)))').order('created_at',{ascending:false})
     setProofs(data||[])
@@ -119,16 +131,25 @@ export default function AdminDashboard({ profile }) {
     if (error) return toast.error(error.message)
     toast.success('Campaign marked as paid ✅'); fetchCampaigns()
   }
+
   async function handleAssignDriver(campaignId) {
     if (!selectedDriver) return toast.error('Select a driver first')
+
+    // Block if driver is already busy
+    if (busyDriverIds.has(selectedDriver)) {
+      return toast.error('This driver is already engaged in another campaign!')
+    }
+
     const {data:ex} = await supabase.from('driver_jobs').select('id').eq('driver_id',selectedDriver).eq('campaign_id',campaignId)
-    if (ex?.length) return toast.error('Driver already assigned!')
+    if (ex?.length) return toast.error('Driver already assigned to this campaign!')
+
     const {error} = await supabase.from('driver_jobs').insert({driver_id:selectedDriver,campaign_id:campaignId,status:'offered'})
     if (error) return toast.error(error.message)
     await supabase.from('campaigns').update({status:'active'}).eq('id',campaignId)
     toast.success('Driver assigned! 🎉')
-    setAssigningJob(null); setSelectedDriver(''); fetchCampaigns()
+    setAssigningJob(null); setSelectedDriver(''); fetchDrivers(); fetchCampaigns()
   }
+
   async function handleApproveProof(proofId, driverJobId, driverId, driverPayout) {
     const {error} = await supabase.from('daily_proofs').update({status:'approved',reviewed_by:profile.id}).eq('id',proofId)
     if (error) return toast.error(error.message)
@@ -251,7 +272,17 @@ export default function AdminDashboard({ profile }) {
                             <select value={selectedDriver} onChange={e=>setSelectedDriver(e.target.value)}
                               style={{ padding:'8px 12px', border:'1.5px solid #D8D8D8', borderRadius:'8px', fontSize:'0.88rem', color:'#111', background:'#fff', outline:'none', flex:1, minWidth:'160px' }}>
                               <option value="">Select driver…</option>
-                              {drivers.map(d=><option key={d.id} value={d.id}>{d.full_name} — {d.city}{d.is_verified?' ✅':''}</option>)}
+                              {drivers
+                                .filter(d => d.city === c.city || c.city === 'both')
+                                .map(d => {
+                                  const isBusy = busyDriverIds.has(d.id)
+                                  return (
+                                    <option key={d.id} value={d.id} disabled={isBusy}>
+                                      {isBusy ? '🔴' : '🟢'} {d.full_name} — {d.city}{d.is_verified ? ' ✅' : ''}{isBusy ? ' (Engaged)' : ' (Free)'}
+                                    </option>
+                                  )
+                                })
+                              }
                             </select>
                             <button style={btn('#1DB954','#fff')} onClick={()=>handleAssignDriver(c.id)}>Assign →</button>
                             <button style={btn('#FDECEA','#C62828')} onClick={()=>{setAssigningJob(null);setSelectedDriver('')}}>Cancel</button>
@@ -271,10 +302,22 @@ export default function AdminDashboard({ profile }) {
           {drivers.length===0
             ? <div style={{ textAlign:'center', padding:'48px', color:'#bbb' }}><div style={{ fontSize:'3rem', marginBottom:'10px' }}>🛺</div><div>No drivers yet</div></div>
             : drivers.map(d=>(
-              <div key={d.id} style={card}>
+              <div key={d.id} style={{ ...card, border: busyDriverIds.has(d.id) ? '1.5px solid #FFE08A' : '1px solid #E8E8E8' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px' }}>
                   <div>
-                    <div style={{ fontWeight:700, marginBottom:'4px' }}>{d.full_name} {d.is_verified && <span style={{ color:'#1DB954', fontSize:'0.82rem' }}>✅ Verified</span>}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
+                      <div style={{ fontWeight:700 }}>{d.full_name}</div>
+                      {d.is_verified && <span style={{ color:'#1DB954', fontSize:'0.82rem' }}>✅ Verified</span>}
+                      {/* Availability badge */}
+                      <span style={{
+                        background: busyDriverIds.has(d.id) ? '#FFF8E6' : '#E6F9EE',
+                        color: busyDriverIds.has(d.id) ? '#7A5900' : '#0A6B30',
+                        fontSize:'0.65rem', fontWeight:800, letterSpacing:'0.06em', textTransform:'uppercase',
+                        padding:'3px 8px', borderRadius:'100px'
+                      }}>
+                        {busyDriverIds.has(d.id) ? '🔴 Engaged' : '🟢 Free'}
+                      </span>
+                    </div>
                     <div style={{ fontSize:'0.82rem', color:'#888', marginBottom:'2px' }}>📞 {d.phone} · 📍 {d.city}</div>
                     <div style={{ fontSize:'0.82rem', color:'#888', marginBottom:'2px' }}>🛺 {d.vehicle_number||'No vehicle number'}</div>
                     <div style={{ fontSize:'0.82rem', color:'#888' }}>💳 UPI: {d.upi_id||'Not set'}</div>

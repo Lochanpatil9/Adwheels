@@ -1,0 +1,85 @@
+import { Router } from 'express'
+import Razorpay from 'razorpay'
+import crypto from 'crypto'
+import supabase from '../lib/supabase.js'
+
+const router = Router()
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+})
+
+// POST /api/payments/create-order
+router.post('/create-order', async (req, res) => {
+  const { campaignId, amount, currency = 'INR' } = req.body
+
+  if (!campaignId || !amount) {
+    return res.status(400).json({ error: 'campaignId and amount are required' })
+  }
+
+  try {
+    const order = await razorpay.orders.create({
+      amount: Math.round(amount), // amount in paise, already multiplied by 100 from frontend
+      currency,
+      receipt: campaignId.replace(/-/g, '').substring(0, 40),
+    })
+
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+    })
+  } catch (err) {
+    console.error('Razorpay order creation error:', err)
+    res.status(500).json({ error: 'Failed to create payment order' })
+  }
+})
+
+// POST /api/payments/verify
+router.post('/verify', async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, campaignId } = req.body
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !campaignId) {
+    return res.status(400).json({ error: 'Missing required payment fields' })
+  }
+
+  try {
+    // Step 1 — Verify signature
+    const body = razorpay_order_id + '|' + razorpay_payment_id
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest('hex')
+
+    const isValid = expectedSignature === razorpay_signature
+
+    if (!isValid) {
+      return res.status(400).json({ success: false, error: 'Payment verification failed' })
+    }
+
+    // Step 2 — Update campaign status to paid
+    const { error: updateError } = await supabase
+      .from('campaigns')
+      .update({ status: 'paid' })
+      .eq('id', campaignId)
+
+    if (updateError) throw updateError
+
+    // Step 3 — Auto assign drivers
+    const { error: rpcError } = await supabase
+      .rpc('auto_assign_drivers', { campaign_id: campaignId })
+
+    if (rpcError) console.error('auto_assign_drivers error:', rpcError)
+    // Don't throw — payment is verified, assignment failure is non-critical
+
+    res.json({ success: true })
+
+  } catch (err) {
+    console.error('Payment verify error:', err)
+    res.status(500).json({ success: false, error: 'Server error during verification' })
+  }
+})
+
+export default router

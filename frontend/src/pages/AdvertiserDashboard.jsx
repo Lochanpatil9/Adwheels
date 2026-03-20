@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { LogOut, Plus, BarChart2 } from 'lucide-react'
+import { createRazorpayOrder, verifyPayment } from '../lib/api'
 
 const PLANS = [
   { id:1, name:'Starter',  price:1500,  rickshaws:1,  driver_payout:600, accent:'#666', features:['1 Rickshaw','1 City','Basic Analytics'] },
@@ -18,6 +19,16 @@ const badge = (s) => {
   const m = { pending:['#FFF8E6','#7A5900'], paid:['#EFF6FF','#1565C0'], active:['#E6F9EE','#0A6B30'], completed:['#F5F5F5','#666'], cancelled:['#FDECEA','#C62828'] }
   const [bg,c] = m[s]||['#F5F5F5','#666']
   return { display:'inline-block', background:bg, color:c, fontSize:'0.7rem', fontWeight:800, letterSpacing:'0.06em', textTransform:'uppercase', padding:'4px 10px', borderRadius:'100px' }
+}
+
+function loadRazorpayScript() {
+  return new Promise(resolve => {
+    if (window.Razorpay) return resolve()
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = resolve
+    document.body.appendChild(script)
+  })
 }
 
 function CampaignAnalytics({ campaign }) {
@@ -79,6 +90,7 @@ export default function AdvertiserDashboard({ profile }) {
   const [form, setForm]         = useState({ company_name:'', city:'', area:'' })
   const [submitting, setSubmitting] = useState(false)
   const [analyticsFor, setAnalyticsFor] = useState(null)
+  const [payingFor, setPayingFor] = useState(null) // campaign being paid
 
   useEffect(() => { fetchCampaigns() }, [])
 
@@ -106,17 +118,102 @@ export default function AdvertiserDashboard({ profile }) {
     if (!form.city)           return toast.error('Select a city')
     if (!form.area)           return toast.error('Enter your target area')
     setSubmitting(true)
+
     const fileName = `${profile.id}_${Date.now()}.${bannerFile.name.split('.').pop()}`
     const { error: upErr } = await supabase.storage.from('banners').upload(fileName, bannerFile)
     if (upErr) { toast.error('Banner upload failed: ' + upErr.message); setSubmitting(false); return }
+
     const { data: { publicUrl } } = supabase.storage.from('banners').getPublicUrl(fileName)
-    const { error } = await supabase.from('campaigns').insert({ advertiser_id:profile.id, plan_id:selectedPlan.id, banner_url:publicUrl, city:form.city, area:form.area, company_name:form.company_name, status:'pending' })
+
+    const { data: newCampaign, error } = await supabase
+      .from('campaigns')
+      .insert({
+        advertiser_id: profile.id,
+        plan_id: selectedPlan.id,
+        banner_url: publicUrl,
+        city: form.city,
+        area: form.area,
+        company_name: form.company_name,
+        status: 'pending'
+      })
+      .select()
+      .single()
+
     if (error) { toast.error(error.message); setSubmitting(false); return }
-    toast.success('Campaign submitted! 🎉 Our team will call you to confirm payment.')
-    setTab('campaigns'); fetchCampaigns()
+
+    // Reset form
     setPlan(null); setBannerFile(null)
     if (bannerPreview) URL.revokeObjectURL(bannerPreview)
     setBannerPreview(null); setForm({ company_name:'', city:'', area:'' }); setSubmitting(false)
+
+    // Immediately open payment for this campaign
+    await fetchCampaigns()
+    setTab('campaigns')
+    toast.success('Campaign created! Opening payment… 💳')
+
+    // Small delay so campaigns list loads first
+    setTimeout(() => handlePayment(newCampaign), 800)
+  }
+
+  async function handlePayment(campaign) {
+    if (payingFor) return // prevent double click
+    setPayingFor(campaign.id)
+
+    try {
+      // Step 1 — Load Razorpay script
+      await loadRazorpayScript()
+
+      // Step 2 — Create order from backend
+      const order = await createRazorpayOrder(campaign.id, campaign.plans?.price * 100 || selectedPlan?.price * 100)
+
+      // Step 3 — Open Razorpay checkout
+      const options = {
+        key: order.key,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: 'AdWheels',
+        description: `${campaign.company_name} — ${campaign.plans?.name || ''} Plan`,
+        handler: async function(response) {
+          try {
+            // Step 4 — Verify on backend → updates campaign + assigns drivers
+            const result = await verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              campaignId: campaign.id,
+            })
+
+            if (result.success) {
+              await fetchCampaigns()
+              toast.success('Payment successful! Drivers are being assigned 🎉')
+              setTab('campaigns')
+            } else {
+              toast.error('Payment verification failed. Please contact support.')
+            }
+          } catch (err) {
+            console.error('Verify error:', err)
+            toast.error('Payment done but verification failed. Contact support.')
+          }
+        },
+        modal: {
+          ondismiss: () => setPayingFor(null)
+        },
+        prefill: {
+          name: profile.full_name,
+          contact: profile.phone || '',
+        },
+        theme: { color: '#FFBF00' },
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.open()
+
+    } catch (err) {
+      console.error('Payment error:', err)
+      toast.error('Could not open payment. Please try again.')
+      setPayingFor(null)
+    }
   }
 
   const activeCampaigns  = campaigns.filter(c=>c.status==='active').length
@@ -208,11 +305,18 @@ export default function AdvertiserDashboard({ profile }) {
                       <span style={badge(c.status)}>{c.status}</span>
                       <span style={{ fontSize:'0.8rem', color:'#888' }}>₹{c.plans?.price?.toLocaleString()}/mo · {c.plans?.rickshaw_count} rickshaw{c.plans?.rickshaw_count>1?'s':''}</span>
                     </div>
+
+                    {/* Pay Now button for pending campaigns */}
                     {c.status==='pending' && (
-                      <div style={{ background:'#FFF8E6', border:'1px solid #FFE08A', borderRadius:'8px', padding:'10px 12px', fontSize:'0.84rem', color:'#7A5900' }}>
-                        ⏳ Our team will call you to confirm payment and activate your ad.
-                      </div>
+                      <button
+                        onClick={() => handlePayment(c)}
+                        disabled={payingFor === c.id}
+                        style={{ ...btn('#FFBF00','#111'), fontSize:'0.85rem', padding:'10px 16px', opacity: payingFor===c.id ? 0.6 : 1 }}
+                      >
+                        💳 {payingFor===c.id ? 'Opening Payment…' : 'Pay Now to Go Live'}
+                      </button>
                     )}
+
                     {(c.status==='active'||c.status==='paid') && (
                       <button onClick={()=>{setAnalyticsFor(c.id);setTab('analytics')}} style={{ background:'#E6F9EE', border:'1px solid #A3E4BE', color:'#0A6B30', borderRadius:'8px', padding:'8px 13px', fontWeight:700, fontSize:'0.82rem', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'5px', marginTop:'4px' }}>
                         <BarChart2 size={13}/> View Stats
@@ -305,10 +409,10 @@ export default function AdvertiserDashboard({ profile }) {
           <input style={inp} placeholder="Target area / colony (e.g. Vijay Nagar, MG Road…)" value={form.area} onChange={e=>setForm(f=>({...f,area:e.target.value}))}/>
 
           <div style={{ background:'#E6F9EE', border:'1px solid #A3E4BE', borderRadius:'12px', padding:'13px 16px', fontSize:'0.84rem', color:'#0A6B30', marginBottom:'18px' }}>
-            ✅ After submitting, our team will call you to confirm payment. Your ad can go live within 90 minutes!
+            💳 After submitting, Razorpay payment will open automatically. Your ad goes live within 90 minutes of payment!
           </div>
           <button onClick={handleCreateCampaign} disabled={submitting} style={{ ...btn(), width:'100%', justifyContent:'center', fontSize:'1rem', padding:'15px', opacity:submitting?.6:1 }}>
-            {submitting ? 'Submitting…' : <><Plus size={16}/> Submit Campaign</>}
+            {submitting ? 'Submitting…' : <><Plus size={16}/> Submit & Pay</>}
           </button>
         </>}
 

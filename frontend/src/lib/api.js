@@ -19,3 +19,23 @@ export async function submitRegistration(data) {
   if (!res.ok) throw new Error('Failed to register')
   return res.json()
 }
+
+export async function createRazorpayOrder(campaignId, amount) {
+  const res = await fetch(`${API_BASE}/api/payments/create-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ campaignId, amount, currency: 'INR' }),
+  })
+  if (!res.ok) throw new Error('Failed to create order')
+  return res.json()
+}
+
+export async function verifyPayment(data) {
+  const res = await fetch(`${API_BASE}/api/payments/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('Payment verification failed')
+  return res.json()
+}
