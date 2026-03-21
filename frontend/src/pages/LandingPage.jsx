@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { submitEnterpriseLead, submitRegistration } from '../lib/api'
 
@@ -6,16 +6,51 @@ import { submitEnterpriseLead, submitRegistration } from '../lib/api'
 function useReveal() {
   useEffect(() => {
     const obs = new IntersectionObserver((entries) => {
-      entries.forEach((e, i) => {
-        if (e.isIntersecting) {
-          setTimeout(() => e.target.classList.add('rv'), i * 60)
-          obs.unobserve(e.target)
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const d = parseInt(entry.target.dataset.delay || '0', 10)
+          setTimeout(() => entry.target.classList.add('rv'), d)
+          obs.unobserve(entry.target)
         }
       })
     }, { threshold: 0.08 })
     document.querySelectorAll('.reveal').forEach(el => obs.observe(el))
     return () => obs.disconnect()
   }, [])
+}
+
+/* ── count-up hook for stat numbers ── */
+function useCountUp(ref, end, duration = 1200) {
+  const [value, setValue] = useState(0)
+  const triggered = useRef(false)
+  useEffect(() => {
+    if (!ref.current) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !triggered.current) {
+        triggered.current = true
+        const start = performance.now()
+        const step = (now) => {
+          const t = Math.min((now - start) / duration, 1)
+          const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+          setValue(Math.round(ease * end))
+          if (t < 1) requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+        obs.unobserve(entry.target)
+      }
+    }, { threshold: 0.3 })
+    obs.observe(ref.current)
+    return () => obs.disconnect()
+  }, [ref, end, duration])
+  return value
+}
+
+function CountUpStat({ end, suffix = '' }) {
+  const ref = useRef(null)
+  const num = typeof end === 'number' ? end : null
+  const val = useCountUp(ref, num || 0)
+  if (num === null) return <span ref={ref}>{suffix}</span>
+  return <span ref={ref}>{val}{suffix}</span>
 }
 
 const scrollTo = id => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
@@ -75,22 +110,26 @@ export default function LandingPage({ onGetStarted }) {
       html{scroll-behavior:smooth}
       body{font-family:'DM Sans',sans-serif}
 
-      /* Reveal */
-      .reveal{opacity:0;transform:translateY(28px);transition:opacity .6s ease,transform .6s ease}
-      .rv{opacity:1;transform:translateY(0)}
+      /* Reveal — Change 1: spring easing + subtle scale */
+      .reveal{opacity:0;transform:translateY(28px) scale(0.97);transition:opacity .5s cubic-bezier(0.16,1,0.3,1),transform .5s cubic-bezier(0.16,1,0.3,1)}
+      .rv{opacity:1;transform:translateY(0) scale(1)}
 
-      /* Nav */
-      .lp-nav{transition:all .3s}
+      /* Section label pills — Change 10: slide from left */
+      .reveal.label-pill{transform:translateX(-8px) translateY(0) scale(0.97)}
+      .reveal.label-pill.rv{transform:translateX(0) translateY(0) scale(1)}
+
+      /* Nav — Change 9: smooth scroll transition */
+      .lp-nav{transition:background .3s ease,box-shadow .3s ease,border-color .3s ease,backdrop-filter .3s ease}
       .lp-nav.stuck{box-shadow:0 4px 24px rgba(0,0,0,0.08);background:rgba(255,255,255,0.98)!important}
 
       /* Gradient text */
       .grad-text{background:linear-gradient(135deg,#FFBF00 0%,#FF6B00 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-      /* Buttons */
-      .btn-pri{background:linear-gradient(135deg,#FFBF00,#FF8C00);color:#111;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.95rem;padding:14px 28px;border:none;border-radius:12px;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(255,191,0,0.4)}
-      .btn-pri:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,140,0,0.45)}
-      .btn-sec{background:transparent;color:#0F172A;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.95rem;padding:13px 26px;border:2px solid #E2E8F0;border-radius:12px;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
-      .btn-sec:hover{border-color:#0F172A;background:#0F172A;color:#fff}
+      /* Buttons — Change 7: scale(1.02) + spring easing */
+      .btn-pri{background:linear-gradient(135deg,#FFBF00,#FF8C00);color:#111;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.95rem;padding:14px 28px;border:none;border-radius:12px;cursor:pointer;transition:all .2s cubic-bezier(0.16,1,0.3,1);display:inline-flex;align-items:center;gap:8px;letter-spacing:-.01em;box-shadow:0 4px 14px rgba(255,191,0,0.4)}
+      .btn-pri:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 8px 24px rgba(255,140,0,0.45)}
+      .btn-sec{background:transparent;color:#0F172A;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.95rem;padding:13px 26px;border:2px solid #E2E8F0;border-radius:12px;cursor:pointer;transition:all .2s cubic-bezier(0.16,1,0.3,1);display:inline-flex;align-items:center;gap:8px}
+      .btn-sec:hover{border-color:#0F172A;background:#0F172A;color:#fff;transform:translateY(-2px) scale(1.02)}
       .btn-ghost{background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:500;color:#475569;transition:color .2s;padding:0}
       .btn-ghost:hover{color:#0F172A}
 
@@ -99,19 +138,28 @@ export default function LandingPage({ onGetStarted }) {
       .lp-inp:focus{border-color:#FFBF00;box-shadow:0 0 0 3px rgba(255,191,0,.12)}
       .lp-lbl{display:block;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748B;margin-bottom:6px}
 
-      /* Card */
-      .lp-card{background:#fff;border:1px solid #F1F5F9;border-radius:20px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
-      .lp-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.09);transform:translateY(-2px);transition:all .2s}
+      /* Card — Change 6: enhanced hover with scale + spring easing */
+      .lp-card{background:#fff;border:1px solid #F1F5F9;border-radius:20px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,.05);transition:all .25s cubic-bezier(0.16,1,0.3,1)}
+      .lp-card:hover{box-shadow:0 12px 36px rgba(0,0,0,.11);transform:translateY(-4px) scale(1.01)}
 
       /* Step number */
       .step-num{font-family:'Bebas Neue',sans-serif;font-size:4rem;line-height:1;color:#F1F5F9;position:absolute;top:16px;right:20px;pointer-events:none}
 
-      /* Ticker */
-      .ticker{display:flex;animation:tick 30s linear infinite;width:max-content}
+      /* Ticker — Change 5: 40s speed + will-change */
+      .ticker{display:flex;animation:tick 40s linear infinite;width:max-content;will-change:transform}
       @keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
+      /* Hero entrance — Change 4: sequenced keyframes */
+      @keyframes heroEnter{from{opacity:0;transform:translateY(20px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+      .hero-seq{opacity:0;animation:heroEnter .5s cubic-bezier(0.16,1,0.3,1) both}
+      .hero-seq-0{animation-delay:0ms}
+      .hero-seq-1{animation-delay:80ms}
+      .hero-seq-2{animation-delay:160ms}
+      .hero-seq-3{animation-delay:240ms}
+      .hero-seq-4{animation-delay:320ms}
+
       /* Mobile nav */
-      .mob-nav{display:none;position:fixed;top:62px;left:0;right:0;background:#fff;border-bottom:1px solid #F1F5F9;flex-direction:column;padding:12px 20px 20px;gap:4px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.12);animation:slideD .2s ease}
+      .mob-nav{display:none;position:fixed;top:62px;left:0;right:0;background:#fff;border-bottom:1px solid #F1F5F9;flex-direction:column;padding:12px 20px 20px;gap:4px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.12);animation:slideD .25s cubic-bezier(0.16,1,0.3,1)}
       @keyframes slideD{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
       .mob-nav.open{display:flex}
       .mob-item{background:none;border:none;color:#374151;font-size:1rem;font-weight:600;padding:14px 0;border-bottom:1px solid #F8FAFC;text-align:left;width:100%;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .2s}
@@ -141,9 +189,9 @@ export default function LandingPage({ onGetStarted }) {
       /* Feature check */
       .feat-check{color:#10B981;font-weight:700;flex-shrink:0}
 
-      /* Plan card hover */
-      .plan-card{border-radius:18px;padding:28px 22px;position:relative;cursor:default;transition:all .25s}
-      .plan-card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,.1)!important}
+      /* Plan card hover — Change 6: scale + spring easing */
+      .plan-card{border-radius:18px;padding:28px 22px;position:relative;cursor:default;transition:all .25s cubic-bezier(0.16,1,0.3,1)}
+      .plan-card:hover{transform:translateY(-4px) scale(1.01);box-shadow:0 16px 40px rgba(0,0,0,.12)!important}
     `}</style>
 
     {/* ═══════════════════════════ NAV ═══════════════════════════ */}
@@ -187,32 +235,32 @@ export default function LandingPage({ onGetStarted }) {
 
       <div style={{maxWidth:'1140px',margin:'0 auto',padding:'90px 32px 80px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'60px',alignItems:'center'}} className="two-col">
 
-        {/* Left */}
+        {/* Left — Change 4: sequenced hero entrance */}
         <div>
           {/* Pill badge */}
-          <div style={{display:'inline-flex',alignItems:'center',gap:'8px',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:'100px',padding:'7px 16px',fontSize:'.8rem',fontWeight:700,color:'#92400E',marginBottom:'28px',letterSpacing:'.02em'}}>
+          <div className="hero-seq hero-seq-0" style={{display:'inline-flex',alignItems:'center',gap:'8px',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:'100px',padding:'7px 16px',fontSize:'.8rem',fontWeight:700,color:'#92400E',marginBottom:'28px',letterSpacing:'.02em'}}>
             <span style={{width:'7px',height:'7px',background:'#F59E0B',borderRadius:'50%',display:'inline-block',animation:'pulse 2s infinite'}}/>
             🛺 Live in Indore & Bhopal
           </div>
           <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
 
-          <h1 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(2.4rem,5vw,3.8rem)',fontWeight:800,lineHeight:1.08,letterSpacing:'-.03em',marginBottom:'22px',color:'#0F172A'}}>
+          <h1 className="hero-seq hero-seq-1" style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(2.4rem,5vw,3.8rem)',fontWeight:800,lineHeight:1.08,letterSpacing:'-.03em',marginBottom:'22px',color:'#0F172A'}}>
             Get Your Ad on<br/>
             <span className="grad-text">1000+ Rickshaws</span><br/>
             in 90 Minutes
           </h1>
 
-          <p style={{fontSize:'1.08rem',color:'#64748B',lineHeight:1.7,marginBottom:'36px',maxWidth:'440px'}}>
+          <p className="hero-seq hero-seq-2" style={{fontSize:'1.08rem',color:'#64748B',lineHeight:1.7,marginBottom:'36px',maxWidth:'440px'}}>
             The fastest, most affordable way to advertise in Indore & Bhopal. No agencies. No waiting. Just upload, assign, and go live.
           </p>
 
-          <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'40px'}}>
+          <div className="hero-seq hero-seq-3" style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'40px'}}>
             <button className="btn-pri" onClick={onGetStarted}>Launch My Ad Now →</button>
             <button className="btn-sec" onClick={()=>scrollTo('how')}>See How It Works</button>
           </div>
 
           {/* Trust row */}
-          <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
+          <div className="hero-seq hero-seq-4" style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
             {['✅ Verified Drivers','📸 Daily Photo Proof','💰 From ₹1,500/mo'].map(t=>(
               <span key={t} className="trust-badge">{t}</span>
             ))}
@@ -303,7 +351,7 @@ export default function LandingPage({ onGetStarted }) {
     <div id="how" style={{background:'#FFFFFF'}}>
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'96px 32px'}} className="lp-sec">
         <div style={{textAlign:'center',maxWidth:'560px',margin:'0 auto 64px'}}>
-          <div className="reveal" style={{display:'inline-block',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#C2410C',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>The Process</div>
+          <div className="reveal label-pill" style={{display:'inline-block',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#C2410C',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>The Process</div>
           <h2 className="reveal" style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(1.8rem,4vw,2.8rem)',fontWeight:800,letterSpacing:'-.02em',color:'#0F172A',lineHeight:1.15,marginBottom:'16px'}}>
             From Upload to <span className="grad-text">On the Road</span>
           </h2>
@@ -312,7 +360,7 @@ export default function LandingPage({ onGetStarted }) {
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'24px'}}>
           {STEPS.map((step,i)=>(
-            <div key={step.n} className="reveal lp-card" style={{position:'relative',overflow:'hidden',borderLeft:`4px solid ${['#FFBF00','#F59E0B','#D97706','#B45309'][i]}`}}>
+            <div key={step.n} className="reveal lp-card" data-delay={i * 80} style={{position:'relative',overflow:'hidden',borderLeft:`4px solid ${['#FFBF00','#F59E0B','#D97706','#B45309'][i]}`,transitionDelay:`${i*80}ms`}}>
               <div className="step-num">{step.n}</div>
               <div style={{fontSize:'2rem',marginBottom:'14px'}}>{step.icon}</div>
               <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1rem',color:'#0F172A',marginBottom:'8px'}}>{step.title}</div>
@@ -334,7 +382,7 @@ export default function LandingPage({ onGetStarted }) {
     <div style={{background:'#F8FAFC'}}>
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'96px 32px'}} className="lp-sec">
         <div style={{textAlign:'center',maxWidth:'520px',margin:'0 auto 56px'}}>
-          <div className="reveal" style={{display:'inline-block',background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#1D4ED8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Who It's For</div>
+          <div className="reveal label-pill" style={{display:'inline-block',background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#1D4ED8',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Who It's For</div>
           <h2 className="reveal" style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(1.8rem,4vw,2.8rem)',fontWeight:800,letterSpacing:'-.02em',color:'#0F172A',lineHeight:1.15}}>
             Built for <span className="grad-text">Both Sides</span>
           </h2>
@@ -342,7 +390,7 @@ export default function LandingPage({ onGetStarted }) {
 
         <div className="two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'24px'}}>
           {/* Advertiser */}
-          <div className="reveal" style={{background:'linear-gradient(135deg,#FFFBEB 0%,#FEF3C7 100%)',border:'1.5px solid #FDE68A',borderRadius:'24px',padding:'40px 32px'}}>
+          <div className="reveal" data-delay={0} style={{background:'linear-gradient(135deg,#FFFBEB 0%,#FEF3C7 100%)',border:'1.5px solid #FDE68A',borderRadius:'24px',padding:'40px 32px',transitionDelay:'0ms'}}>
             <div style={{width:'56px',height:'56px',background:'linear-gradient(135deg,#FFBF00,#FF8C00)',borderRadius:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.6rem',marginBottom:'20px',boxShadow:'0 8px 20px rgba(255,191,0,.35)'}}>🏢</div>
             <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1.5rem',color:'#0F172A',marginBottom:'8px'}}>For Advertisers</h3>
             <p style={{color:'#64748B',fontSize:'.92rem',lineHeight:1.65,marginBottom:'24px'}}>Reach thousands of people daily in your target area — faster and cheaper than any other channel.</p>
@@ -358,7 +406,7 @@ export default function LandingPage({ onGetStarted }) {
           </div>
 
           {/* Driver */}
-          <div className="reveal" style={{background:'linear-gradient(135deg,#F0FDF4 0%,#DCFCE7 100%)',border:'1.5px solid #A7F3D0',borderRadius:'24px',padding:'40px 32px'}}>
+          <div className="reveal" data-delay={120} style={{background:'linear-gradient(135deg,#F0FDF4 0%,#DCFCE7 100%)',border:'1.5px solid #A7F3D0',borderRadius:'24px',padding:'40px 32px',transitionDelay:'120ms'}}>
             <div style={{width:'56px',height:'56px',background:'linear-gradient(135deg,#10B981,#059669)',borderRadius:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.6rem',marginBottom:'20px',boxShadow:'0 8px 20px rgba(16,185,129,.3)'}}>🛺</div>
             <h3 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1.5rem',color:'#0F172A',marginBottom:'8px'}}>For Drivers</h3>
             <p style={{color:'#64748B',fontSize:'.92rem',lineHeight:1.65,marginBottom:'24px'}}>Earn extra income every month — just by carrying a banner on your rickshaw. No extra work needed.</p>
@@ -381,9 +429,9 @@ export default function LandingPage({ onGetStarted }) {
     {/* ═══════════════════════════ STATS BAND ═══════════════════════════ */}
     <div style={{background:'linear-gradient(135deg,#0F172A 0%,#1E293B 100%)',padding:'64px 32px'}}>
       <div style={{maxWidth:'900px',margin:'0 auto',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'32px',textAlign:'center'}}>
-        {[['90','min','Avg. Time to Go Live'],['₹1,500','/mo','Starting Price'],['100+','brands','Trust AdWheels'],['2','cities','Indore & Bhopal']].map(([n,u,l])=>(
-          <div key={l} className="reveal">
-            <div style={{fontFamily:'Bebas Neue',fontSize:'3.2rem',color:'#FFBF00',lineHeight:1}}>{n}<span style={{fontFamily:'DM Sans',fontSize:'1rem',color:'rgba(255,255,255,.4)'}}> {u}</span></div>
+        {[['90','min','Avg. Time to Go Live',90],['₹1,500','/mo','Starting Price',null],['100+','brands','Trust AdWheels',100],['2','cities','Indore & Bhopal',2]].map(([n,u,l,countVal],i)=>(
+          <div key={l} className="reveal" data-delay={i * 100} style={{transitionDelay:`${i*100}ms`}}>
+            <div style={{fontFamily:'Bebas Neue',fontSize:'3.2rem',color:'#FFBF00',lineHeight:1}}>{countVal !== null ? <CountUpStat end={countVal} suffix={n.includes('+')?'+':''}/> : n}<span style={{fontFamily:'DM Sans',fontSize:'1rem',color:'rgba(255,255,255,.4)'}}> {u}</span></div>
             <div style={{fontSize:'.8rem',color:'rgba(255,255,255,.55)',textTransform:'uppercase',letterSpacing:'.08em',marginTop:'6px',fontWeight:700}}>{l}</div>
           </div>
         ))}
@@ -394,7 +442,7 @@ export default function LandingPage({ onGetStarted }) {
     <div id="pricing" style={{background:'#FFFFFF'}}>
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'96px 32px'}} className="lp-sec">
         <div style={{textAlign:'center',maxWidth:'560px',margin:'0 auto 60px'}}>
-          <div className="reveal" style={{display:'inline-block',background:'#F0FDF4',border:'1px solid #A7F3D0',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#065F46',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Simple Pricing</div>
+          <div className="reveal label-pill" style={{display:'inline-block',background:'#F0FDF4',border:'1px solid #A7F3D0',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#065F46',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Simple Pricing</div>
           <h2 className="reveal" style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(1.8rem,4vw,2.8rem)',fontWeight:800,letterSpacing:'-.02em',color:'#0F172A',lineHeight:1.15,marginBottom:'14px'}}>
             Honest Pricing, <span className="grad-text">No Surprises</span>
           </h2>
@@ -402,8 +450,8 @@ export default function LandingPage({ onGetStarted }) {
         </div>
 
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'20px'}}>
-          {PLANS.map(plan=>(
-            <div key={plan.name} className="reveal plan-card" style={{background:plan.bg,border:plan.tag?`2px solid ${plan.accent}`:'1.5px solid #F1F5F9',boxShadow:plan.tag?`0 8px 32px ${plan.accent}20`:'0 2px 12px rgba(0,0,0,.04)'}}>
+          {PLANS.map((plan,i)=>(
+            <div key={plan.name} className="reveal plan-card" data-delay={i * 80} style={{background:plan.bg,border:plan.tag?`2px solid ${plan.accent}`:'1.5px solid #F1F5F9',boxShadow:plan.tag?`0 8px 32px ${plan.accent}20`:'0 2px 12px rgba(0,0,0,.04)',transitionDelay:`${i*80}ms`}}>
               {plan.tag && <div style={{position:'absolute',top:'-13px',left:'50%',transform:'translateX(-50%)',background:plan.accent,color:'#fff',fontSize:'.63rem',fontWeight:800,letterSpacing:'.1em',textTransform:'uppercase',padding:'5px 16px',borderRadius:'100px',whiteSpace:'nowrap'}}>{plan.tag}</div>}
               <div style={{fontSize:'.72rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#94A3B8',marginBottom:'10px'}}>{plan.name}</div>
               <div style={{fontFamily:'Bebas Neue',fontSize:'2.8rem',color:plan.accent,lineHeight:1,marginBottom:'4px'}}>{plan.price}<span style={{fontFamily:'DM Sans',fontSize:'.9rem',color:'#94A3B8'}}> / {plan.mo}</span></div>
@@ -422,7 +470,7 @@ export default function LandingPage({ onGetStarted }) {
           ))}
 
           {/* Enterprise */}
-          <div className="reveal plan-card" style={{background:'linear-gradient(135deg,#FAF5FF,#EDE9FE)',border:'1.5px solid #C4B5FD'}}>
+          <div className="reveal plan-card" data-delay={320} style={{background:'linear-gradient(135deg,#FAF5FF,#EDE9FE)',border:'1.5px solid #C4B5FD',transitionDelay:'320ms'}}>
             <div style={{fontSize:'.72rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'#7C3AED',marginBottom:'10px'}}>Enterprise</div>
             <div style={{fontFamily:'Bebas Neue',fontSize:'2.8rem',color:'#7C3AED',lineHeight:1,marginBottom:'4px'}}>Custom</div>
             <div style={{fontSize:'.83rem',color:'#64748B',marginBottom:'20px'}}>25+ rickshaws · All cities</div>
@@ -446,7 +494,7 @@ export default function LandingPage({ onGetStarted }) {
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'96px 32px'}} className="lp-sec">
         <div className="two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'64px',alignItems:'start'}}>
           <div>
-            <div className="reveal" style={{display:'inline-block',background:'#FAF5FF',border:'1px solid #DDD6FE',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#6D28D9',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Enterprise</div>
+            <div className="reveal label-pill" style={{display:'inline-block',background:'#FAF5FF',border:'1px solid #DDD6FE',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#6D28D9',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Enterprise</div>
             <h2 className="reveal" style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(1.8rem,4vw,2.6rem)',fontWeight:800,letterSpacing:'-.02em',color:'#0F172A',lineHeight:1.15,marginBottom:'16px'}}>
               Big Brand?<br/><span style={{color:'#7C3AED'}}>Let's Build Something Big.</span>
             </h2>
@@ -511,7 +559,7 @@ export default function LandingPage({ onGetStarted }) {
       <div style={{maxWidth:'1100px',margin:'0 auto',padding:'96px 32px'}} className="lp-sec">
         <div className="two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'64px',alignItems:'start'}}>
           <div>
-            <div className="reveal" style={{display:'inline-block',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#92400E',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Join AdWheels</div>
+            <div className="reveal label-pill" style={{display:'inline-block',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:'100px',padding:'5px 14px',fontSize:'.75rem',fontWeight:800,color:'#92400E',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'16px'}}>Join AdWheels</div>
             <h2 className="reveal" style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'clamp(1.8rem,4vw,2.6rem)',fontWeight:800,letterSpacing:'-.02em',color:'#0F172A',lineHeight:1.15,marginBottom:'16px'}}>
               Register <span className="grad-text">Right Now</span>
             </h2>
