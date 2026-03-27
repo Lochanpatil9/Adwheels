@@ -91,7 +91,7 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
           </div>
         </div>
 
-        <div style={{position:'relative',zIndex:1,fontSize:'.78rem',color:'rgba(255,255,255,.25)'}}>© 2024 AdWheels. All rights reserved.</div>
+        <div style={{position:'relative',zIndex:1,fontSize:'.78rem',color:'rgba(255,255,255,.25)'}}>© {new Date().getFullYear()} AdWheels. All rights reserved.</div>
       </div>
 
       {/* ── Right panel (form) ── */}

@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus, ChevronDown, Clock, RefreshCw, Search, Eye, Zap } from 'lucide-react'
 import { sendNotification } from '../lib/api'
+import NotificationBell from '../components/NotificationBell'
 
 const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
-const btn = (bg = '#FFBF00', col = '#111') => ({ background: bg, color: col, border: 'none', borderRadius: '8px', padding: '9px 16px', fontWeight: 700, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', transition: 'opacity .18s' })
+const btn = (bg = '#FFBF00', col = '#111') => ({ background: bg, color: col, border: 'none', borderRadius: '8px', padding: '9px 16px', fontWeight: 700, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', transition: 'all .18s' })
 const badge = (s) => {
   const m = { pending: ['#FFF8E6', '#7A5900'], paid: ['#EFF6FF', '#1565C0'], active: ['#E6F9EE', '#0A6B30'], completed: ['#F5F5F5', '#666'], cancelled: ['#FDECEA', '#C62828'], offered: ['#FFF8E6', '#7A5900'], rejected: ['#FDECEA', '#C62828'], requested: ['#FFF8E6', '#7A5900'], approved: ['#E6F9EE', '#0A6B30'], advertiser: ['#FFF0EB', '#8B2500'], driver: ['#E6F9EE', '#0A6B30'], admin: ['#FDECEA', '#C62828'] }
   const [bg, c] = m[s] || ['#F5F5F5', '#666']
@@ -14,9 +15,22 @@ const badge = (s) => {
 }
 
 // ═══════════════════════════════════════════
+// Image Lightbox
+// ═══════════════════════════════════════════
+function Lightbox({ src, onClose }) {
+  if (!src) return null
+  return (
+    <div className="lightbox-overlay" onClick={onClose}>
+      <button className="lightbox-close" onClick={onClose}>✕</button>
+      <img src={src} alt="Full view" onClick={e => e.stopPropagation()} />
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════
 // Campaign Detail Expanded View
 // ═══════════════════════════════════════════
-function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJob, setAssigningJob, selectedDriver, setSelectedDriver, busyDriverIds, onActivate }) {
+function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJob, setAssigningJob, selectedDriver, setSelectedDriver, busyDriverIds, onMarkPaid, onActivate }) {
   const [assigned, setAssigned] = useState([])
   const [proofStats, setProofStats] = useState({ total: 0, approved: 0, pending: 0 })
   const [loading, setLoading] = useState(true)
@@ -24,7 +38,6 @@ function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJ
   useEffect(() => { fetchDetails() }, [campaign.id])
 
   async function fetchDetails() {
-    // Fetch assigned drivers
     const { data: jobs } = await supabase
       .from('driver_jobs')
       .select('driver_id, status')
@@ -32,8 +45,6 @@ function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJ
       .neq('status', 'rejected')
     setAssigned(jobs || [])
 
-    // Fetch proof stats
-    const jobIds = (jobs || []).map(j => j.driver_id)
     if (jobs && jobs.length > 0) {
       const { data: jobRows } = await supabase
         .from('driver_jobs')
@@ -129,7 +140,12 @@ function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJ
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {campaign.status === 'pending' && (
-          <button style={btn('#FFBF00', '#111')} onClick={() => onActivate(campaign.id)}>✅ Mark as Paid</button>
+          <button className="action-btn" style={btn('#FFBF00', '#111')} onClick={() => onMarkPaid(campaign.id)}>💳 Mark as Paid</button>
+        )}
+        {campaign.status === 'paid' && (
+          <button className="action-btn" style={btn('#1DB954', '#fff')} onClick={() => onActivate(campaign.id)}>
+            <Zap size={13} /> Activate Campaign
+          </button>
         )}
         {(campaign.status === 'paid' || campaign.status === 'active') && (
           <>
@@ -150,43 +166,14 @@ function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJ
                     })
                   }
                 </select>
-                <button style={btn('#1DB954', '#fff')} onClick={() => onAssignDriver(campaign.id)}>Assign →</button>
-                <button style={btn('#FDECEA', '#C62828')} onClick={() => { setAssigningJob(null); setSelectedDriver('') }}>Cancel</button>
+                <button className="action-btn" style={btn('#1DB954', '#fff')} onClick={() => onAssignDriver(campaign.id)}>Assign →</button>
+                <button className="action-btn" style={btn('#FDECEA', '#C62828')} onClick={() => { setAssigningJob(null); setSelectedDriver('') }}>Cancel</button>
               </div>
-              : <button style={btn('#F5F5F5', '#555')} onClick={() => setAssigningJob(campaign.id)}><Plus size={13} /> Assign Driver</button>
+              : <button className="action-btn" style={btn('#F5F5F5', '#555')} onClick={() => setAssigningJob(campaign.id)}><Plus size={13} /> Assign Driver</button>
             }
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-function AssignedDrivers({ campaignId, allDrivers }) {
-  const [assigned, setAssigned] = useState([])
-  useEffect(() => {
-    supabase.from('driver_jobs').select('driver_id,status').eq('campaign_id', campaignId).neq('status', 'rejected')
-      .then(({ data }) => setAssigned(data || []))
-  }, [campaignId])
-  if (!assigned.length) return <div style={{ fontSize: '0.82rem', color: '#aaa', marginTop: '8px', fontStyle: 'italic' }}>No drivers assigned yet</div>
-  return (
-    <div style={{ marginTop: '12px' }}>
-      <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0A6B30', marginBottom: '8px' }}>Assigned Drivers ({assigned.length})</div>
-      {assigned.map(a => {
-        const d = allDrivers.find(x => x.id === a.driver_id)
-        return (
-          <div key={a.driver_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F0FFF6', border: '1px solid #A3E4BE', borderRadius: '10px', padding: '10px 14px', marginBottom: '6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🛺</span>
-              <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{d?.full_name || 'Unknown Driver'}</div>
-                <div style={{ fontSize: '0.75rem', color: '#888' }}>{d?.city} · {d?.phone}</div>
-              </div>
-            </div>
-            <span style={badge(a.status)}>{a.status}</span>
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -239,14 +226,33 @@ export default function AdminDashboard({ profile }) {
   const [users, setUsers] = useState([])
   const [assigningJob, setAssigningJob] = useState(null)
   const [selectedDriver, setSelectedDriver] = useState('')
-  const [busyDriverIds, setBusyDriverIds] = useState(new Set()) // drivers with active jobs
+  const [busyDriverIds, setBusyDriverIds] = useState(new Set())
 
   // Campaign tab state
   const [campaignFilter, setCampaignFilter] = useState('all')
   const [expandedCampaign, setExpandedCampaign] = useState(null)
 
+  // Driver search
+  const [driverSearch, setDriverSearch] = useState('')
+
+  // Loading states for actions
+  const [actionLoading, setActionLoading] = useState({})
+
+  // Lightbox
+  const [lightboxSrc, setLightboxSrc] = useState(null)
+
+  // Refresh
+  const [refreshing, setRefreshing] = useState(false)
+
   useEffect(() => { fetchAll() }, [])
   async function fetchAll() { await Promise.all([fetchCampaigns(), fetchDrivers(), fetchProofs(), fetchPayouts(), fetchUsers()]) }
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await fetchAll()
+    setTimeout(() => setRefreshing(false), 600)
+    toast.success('Data refreshed')
+  }
 
   async function fetchCampaigns() {
     const { data } = await supabase.from('campaigns').select('*, plans(name,price,rickshaw_count,driver_payout), users(full_name,phone,city)').order('created_at', { ascending: false })
@@ -257,7 +263,6 @@ export default function AdminDashboard({ profile }) {
     const { data } = await supabase.from('users').select('*').eq('role', 'driver')
     setDrivers(data || [])
 
-    // fetch all active/offered driver_jobs to know who is busy
     const { data: activeJobs } = await supabase
       .from('driver_jobs')
       .select('driver_id')
@@ -280,37 +285,41 @@ export default function AdminDashboard({ profile }) {
     setUsers(data || [])
   }
 
-  async function handleActivateCampaign(id) {
+  async function handleMarkPaid(id) {
+    setActionLoading(prev => ({ ...prev, [`paid_${id}`]: true }))
     const { error } = await supabase.from('campaigns').update({ status: 'paid' }).eq('id', id)
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`paid_${id}`]: false })); return }
     toast.success('Campaign marked as paid ✅'); fetchCampaigns()
+    setActionLoading(prev => ({ ...prev, [`paid_${id}`]: false }))
   }
 
   async function handleAdminActivateCampaign(id) {
-    // Admin manual activation — set to active with activated_at
+    if (!window.confirm('Activate this campaign? It will start the 30-day countdown.')) return
+    setActionLoading(prev => ({ ...prev, [`activate_${id}`]: true }))
     const { error } = await supabase.from('campaigns').update({
       status: 'active',
       activated_at: new Date().toISOString()
     }).eq('id', id)
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`activate_${id}`]: false })); return }
     toast.success('Campaign activated ✅'); fetchCampaigns()
+    setActionLoading(prev => ({ ...prev, [`activate_${id}`]: false }))
   }
 
   async function handleAssignDriver(campaignId) {
     if (!selectedDriver) return toast.error('Select a driver first')
 
-    // Block if driver is already busy
     if (busyDriverIds.has(selectedDriver)) {
       return toast.error('This driver is already engaged in another campaign!')
     }
 
+    setActionLoading(prev => ({ ...prev, [`assign_${campaignId}`]: true }))
+
     const { data: ex } = await supabase.from('driver_jobs').select('id').eq('driver_id', selectedDriver).eq('campaign_id', campaignId)
-    if (ex?.length) return toast.error('Driver already assigned to this campaign!')
+    if (ex?.length) { toast.error('Driver already assigned to this campaign!'); setActionLoading(prev => ({ ...prev, [`assign_${campaignId}`]: false })); return }
 
     const { error } = await supabase.from('driver_jobs').insert({ driver_id: selectedDriver, campaign_id: campaignId, status: 'offered' })
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`assign_${campaignId}`]: false })); return }
 
-    // Also set activated_at if campaign becomes active for the first time
     const campaign = campaigns.find(c => c.id === campaignId)
     const updateData = { status: 'active' }
     if (!campaign?.activated_at) {
@@ -320,7 +329,6 @@ export default function AdminDashboard({ profile }) {
 
     toast.success('Driver assigned! 🎉')
 
-    // Trigger 1 — Notify the driver about new job offer
     try {
       await sendNotification({
         userId: selectedDriver,
@@ -333,16 +341,17 @@ export default function AdminDashboard({ profile }) {
     }
 
     setAssigningJob(null); setSelectedDriver(''); fetchDrivers(); fetchCampaigns()
+    setActionLoading(prev => ({ ...prev, [`assign_${campaignId}`]: false }))
   }
 
   async function handleApproveProof(proofId, driverJobId, driverId, driverPayout) {
+    setActionLoading(prev => ({ ...prev, [`approve_${proofId}`]: true }))
     const { error } = await supabase.from('daily_proofs').update({ status: 'approved', reviewed_by: profile.id }).eq('id', proofId)
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`approve_${proofId}`]: false })); return }
     const amount = Math.round((driverPayout || 600) / 30)
     await supabase.from('earnings').insert({ driver_id: driverId, driver_job_id: driverJobId, amount, earning_date: new Date().toISOString().split('T')[0], type: 'daily' })
     toast.success(`✅ Approved + ₹${amount} added`)
 
-    // Trigger 4 — Notify driver about proof approval
     try {
       await sendNotification({
         userId: driverId,
@@ -355,18 +364,25 @@ export default function AdminDashboard({ profile }) {
     }
 
     fetchProofs()
+    setActionLoading(prev => ({ ...prev, [`approve_${proofId}`]: false }))
   }
+
   async function handleRejectProof(proofId) {
+    if (!window.confirm('Reject this proof? The driver will not earn for this day.')) return
+    setActionLoading(prev => ({ ...prev, [`reject_${proofId}`]: true }))
     const { error } = await supabase.from('daily_proofs').update({ status: 'rejected', reviewed_by: profile.id }).eq('id', proofId)
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`reject_${proofId}`]: false })); return }
     toast.success('Proof rejected'); fetchProofs()
+    setActionLoading(prev => ({ ...prev, [`reject_${proofId}`]: false }))
   }
+
   async function handleProcessPayout(payoutId) {
+    if (!window.confirm('Mark this payout as paid? Make sure you have transferred the money.')) return
+    setActionLoading(prev => ({ ...prev, [`payout_${payoutId}`]: true }))
     const { error } = await supabase.from('payouts').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', payoutId)
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`payout_${payoutId}`]: false })); return }
     toast.success('Payout marked as paid 💸')
 
-    // Trigger 5 — Notify driver about payout
     try {
       const payout = payouts.find(p => p.id === payoutId)
       if (payout) {
@@ -382,11 +398,16 @@ export default function AdminDashboard({ profile }) {
     }
 
     fetchPayouts()
+    setActionLoading(prev => ({ ...prev, [`payout_${payoutId}`]: false }))
   }
+
   async function handleVerifyDriver(driverId) {
+    if (!window.confirm('Verify this driver? This confirms their identity and allows them to receive jobs.')) return
+    setActionLoading(prev => ({ ...prev, [`verify_${driverId}`]: true }))
     const { error } = await supabase.from('users').update({ is_verified: true }).eq('id', driverId)
-    if (error) return toast.error(error.message)
+    if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`verify_${driverId}`]: false })); return }
     toast.success('Driver verified ✅'); fetchDrivers()
+    setActionLoading(prev => ({ ...prev, [`verify_${driverId}`]: false }))
   }
 
   const totalRevenue = campaigns.filter(c => !['pending', 'cancelled'].includes(c.status)).reduce((s, c) => s + (c.plans?.price || 0), 0)
@@ -418,6 +439,16 @@ export default function AdminDashboard({ profile }) {
     { key: 'cancelled', label: 'Cancelled' },
   ]
 
+  // Filtered drivers
+  const filteredDrivers = driverSearch
+    ? drivers.filter(d =>
+      (d.full_name || '').toLowerCase().includes(driverSearch.toLowerCase()) ||
+      (d.phone || '').includes(driverSearch) ||
+      (d.city || '').toLowerCase().includes(driverSearch.toLowerCase()) ||
+      (d.vehicle_number || '').toLowerCase().includes(driverSearch.toLowerCase())
+    )
+    : drivers
+
   const TABS = [
     { key: 'home', label: '🏠 Home' },
     { key: 'campaigns', label: `📢 Ads (${campaigns.length})` },
@@ -431,6 +462,9 @@ export default function AdminDashboard({ profile }) {
   return (
     <div style={{ minHeight: '100vh', background: '#F5F5F5', color: '#111', fontFamily: "'DM Sans',sans-serif" }}>
 
+      {/* Lightbox */}
+      <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+
       {/* NAV */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', padding: '0 18px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -438,6 +472,12 @@ export default function AdminDashboard({ profile }) {
           <span style={{ background: '#FDECEA', color: '#C62828', border: '1px solid #FFAAAA', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 9px', borderRadius: '100px' }}>Admin</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Refresh button */}
+          <button onClick={handleRefresh} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888' }} title="Refresh data">
+            <RefreshCw size={14} className={refreshing ? 'refresh-spin' : ''} />
+          </button>
+          {/* Notification Bell */}
+          <NotificationBell userId={profile.id} />
           <span style={{ fontSize: '0.84rem', color: '#666' }}>👑 {profile.full_name}</span>
           <button onClick={signOut} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 12px', fontSize: '0.82rem', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <LogOut size={13} /> Logout
@@ -448,7 +488,7 @@ export default function AdminDashboard({ profile }) {
       {/* TABS */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', padding: '0 6px' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 13px', border: 'none', background: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#C62828' : '#999', borderBottom: tab === t.key ? '2.5px solid #E53935' : '2.5px solid transparent', flexShrink: 0 }}>
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 13px', border: 'none', background: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#C62828' : '#999', borderBottom: tab === t.key ? '2.5px solid #E53935' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s' }}>
             {t.label}
           </button>
         ))}
@@ -457,7 +497,7 @@ export default function AdminDashboard({ profile }) {
       <div style={{ padding: '16px', maxWidth: '900px', margin: '0 auto' }}>
 
         {/* HOME */}
-        {tab === 'home' && <>
+        {tab === 'home' && <div className="tab-content">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '12px', marginBottom: '14px' }}>
             {[{ n: `₹${totalRevenue.toLocaleString()}`, l: 'Revenue', c: '#D49800' }, { n: activeCampaigns, l: 'Active Ads', c: '#1DB954' }, { n: drivers.length, l: 'Drivers', c: '#1565C0' }, { n: pendingProofs, l: 'Photos to Review', c: '#E53935' }, { n: pendingPayouts, l: 'Payout Requests', c: '#FF8C00' }].map(x => (
               <div key={x.l} style={card}>
@@ -466,8 +506,8 @@ export default function AdminDashboard({ profile }) {
               </div>
             ))}
           </div>
-          {pendingProofs > 0 && <div onClick={() => setTab('proofs')} style={{ background: '#FDECEA', border: '1px solid #FFAAAA', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#C62828', fontWeight: 700, cursor: 'pointer', marginBottom: '10px' }}>🔴 {pendingProofs} photo{pendingProofs > 1 ? 's' : ''} waiting for your review</div>}
-          {pendingPayouts > 0 && <div onClick={() => setTab('payouts')} style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', marginBottom: '10px' }}>💸 {pendingPayouts} payout request{pendingPayouts > 1 ? 's' : ''} pending</div>}
+          {pendingProofs > 0 && <div onClick={() => setTab('proofs')} style={{ background: '#FDECEA', border: '1px solid #FFAAAA', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#C62828', fontWeight: 700, cursor: 'pointer', marginBottom: '10px', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>🔴 {pendingProofs} photo{pendingProofs > 1 ? 's' : ''} waiting for your review</div>}
+          {pendingPayouts > 0 && <div onClick={() => setTab('payouts')} style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', marginBottom: '10px', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>💸 {pendingPayouts} payout request{pendingPayouts > 1 ? 's' : ''} pending</div>}
           <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '12px' }}>Recent Campaigns</div>
           {campaigns.slice(0, 5).map(c => (
             <div key={c.id} style={card}>
@@ -480,10 +520,10 @@ export default function AdminDashboard({ profile }) {
               </div>
             </div>
           ))}
-        </>}
+        </div>}
 
         {/* CAMPAIGNS — with filters + expandable cards */}
-        {tab === 'campaigns' && <>
+        {tab === 'campaigns' && <div className="tab-content">
           {/* Filter buttons */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
             {FILTERS.map(f => (
@@ -569,27 +609,46 @@ export default function AdminDashboard({ profile }) {
                       selectedDriver={selectedDriver}
                       setSelectedDriver={setSelectedDriver}
                       busyDriverIds={busyDriverIds}
-                      onActivate={handleActivateCampaign}
+                      onMarkPaid={handleMarkPaid}
+                      onActivate={handleAdminActivateCampaign}
                     />
                   )}
                 </div>
               )
             })
           }
-        </>}
+        </div>}
 
         {/* DRIVERS */}
-        {tab === 'drivers' && <>
-          {drivers.length === 0
-            ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>🛺</div><div>No drivers yet</div></div>
-            : drivers.map(d => (
+        {tab === 'drivers' && <div className="tab-content">
+          {/* Search */}
+          <div style={{ position: 'relative', marginBottom: '16px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#bbb', pointerEvents: 'none' }} />
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search by name, phone, city, or vehicle…"
+              value={driverSearch}
+              onChange={e => setDriverSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Result count */}
+          {driverSearch && (
+            <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '10px' }}>
+              {filteredDrivers.length} result{filteredDrivers.length !== 1 ? 's' : ''} found
+            </div>
+          )}
+
+          {filteredDrivers.length === 0
+            ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>🛺</div><div>{driverSearch ? 'No drivers match your search' : 'No drivers yet'}</div></div>
+            : filteredDrivers.map(d => (
               <div key={d.id} style={{ ...card, border: busyDriverIds.has(d.id) ? '1.5px solid #FFE08A' : '1px solid #E8E8E8' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <div style={{ fontWeight: 700 }}>{d.full_name}</div>
                       {d.is_verified && <span style={{ color: '#1DB954', fontSize: '0.82rem' }}>✅ Verified</span>}
-                      {/* Availability badge */}
                       <span style={{
                         background: busyDriverIds.has(d.id) ? '#FFF8E6' : '#E6F9EE',
                         color: busyDriverIds.has(d.id) ? '#7A5900' : '#0A6B30',
@@ -603,15 +662,24 @@ export default function AdminDashboard({ profile }) {
                     <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>🛺 {d.vehicle_number || 'No vehicle number'}</div>
                     <div style={{ fontSize: '0.82rem', color: '#888' }}>💳 UPI: {d.upi_id || 'Not set'}</div>
                   </div>
-                  {!d.is_verified && <button style={btn('#1DB954', '#fff')} onClick={() => handleVerifyDriver(d.id)}><CheckCircle size={14} /> Verify</button>}
+                  {!d.is_verified && (
+                    <button
+                      className="action-btn"
+                      style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`verify_${d.id}`] ? .6 : 1 }}
+                      onClick={() => handleVerifyDriver(d.id)}
+                      disabled={actionLoading[`verify_${d.id}`]}
+                    >
+                      <CheckCircle size={14} /> {actionLoading[`verify_${d.id}`] ? 'Verifying…' : 'Verify'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))
           }
-        </>}
+        </div>}
 
         {/* PROOFS */}
-        {tab === 'proofs' && <>
+        {tab === 'proofs' && <div className="tab-content">
           {proofs.length === 0
             ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>📷</div><div>No photos yet</div></div>
             : proofs.map(p => (
@@ -623,24 +691,47 @@ export default function AdminDashboard({ profile }) {
                     <span style={badge(p.status)}>{p.status}</span>
                     {p.status === 'pending' && (
                       <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                        <button style={btn('#1DB954', '#fff')} onClick={() => handleApproveProof(p.id, p.driver_job_id, p.driver_id, p.driver_jobs?.campaigns?.plans?.driver_payout)}>
-                          <CheckCircle size={14} /> Approve + ₹{Math.round((p.driver_jobs?.campaigns?.plans?.driver_payout || 600) / 30)}
+                        <button
+                          className="action-btn"
+                          style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`approve_${p.id}`] ? .6 : 1 }}
+                          onClick={() => handleApproveProof(p.id, p.driver_job_id, p.driver_id, p.driver_jobs?.campaigns?.plans?.driver_payout)}
+                          disabled={actionLoading[`approve_${p.id}`]}
+                        >
+                          <CheckCircle size={14} /> {actionLoading[`approve_${p.id}`] ? 'Approving…' : `Approve + ₹${Math.round((p.driver_jobs?.campaigns?.plans?.driver_payout || 600) / 30)}`}
                         </button>
-                        <button style={btn('#FDECEA', '#C62828')} onClick={() => handleRejectProof(p.id)}>
-                          <XCircle size={14} /> Reject
+                        <button
+                          className="action-btn"
+                          style={{ ...btn('#FDECEA', '#C62828'), opacity: actionLoading[`reject_${p.id}`] ? .6 : 1 }}
+                          onClick={() => handleRejectProof(p.id)}
+                          disabled={actionLoading[`reject_${p.id}`]}
+                        >
+                          <XCircle size={14} /> {actionLoading[`reject_${p.id}`] ? 'Rejecting…' : 'Reject'}
                         </button>
                       </div>
                     )}
                   </div>
-                  {p.photo_url && <img src={p.photo_url} alt="proof" style={{ width: '130px', height: '84px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E8E8E8', flexShrink: 0 }} />}
+                  {/* Clickable proof image — opens lightbox */}
+                  {p.photo_url && (
+                    <div
+                      onClick={() => setLightboxSrc(p.photo_url)}
+                      style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0 }}
+                      title="Click to enlarge"
+                    >
+                      <img src={p.photo_url} alt="proof" style={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E8E8E8' }} />
+                      <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.55)', borderRadius: '6px', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Eye size={11} color="#fff" />
+                        <span style={{ fontSize: '0.6rem', color: '#fff', fontWeight: 700 }}>View</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
           }
-        </>}
+        </div>}
 
         {/* PAYOUTS */}
-        {tab === 'payouts' && <>
+        {tab === 'payouts' && <div className="tab-content">
           {payouts.length === 0
             ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>💸</div><div>No payout requests yet</div></div>
             : payouts.map(p => (
@@ -657,18 +748,23 @@ export default function AdminDashboard({ profile }) {
                     <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '4px' }}>Requested: {new Date(p.requested_at).toLocaleDateString()}</div>
                   </div>
                   {p.status === 'requested' && (
-                    <button style={btn('#1DB954', '#fff')} onClick={() => handleProcessPayout(p.id)}>
-                      <Wallet size={14} /> Mark Paid
+                    <button
+                      className="action-btn"
+                      style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`payout_${p.id}`] ? .6 : 1 }}
+                      onClick={() => handleProcessPayout(p.id)}
+                      disabled={actionLoading[`payout_${p.id}`]}
+                    >
+                      <Wallet size={14} /> {actionLoading[`payout_${p.id}`] ? 'Processing…' : 'Mark Paid'}
                     </button>
                   )}
                 </div>
               </div>
             ))
           }
-        </>}
+        </div>}
 
         {/* USERS */}
-        {tab === 'users' && <>
+        {tab === 'users' && <div className="tab-content">
           {users.map(u => (
             <div key={u.id} style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -680,9 +776,9 @@ export default function AdminDashboard({ profile }) {
               </div>
             </div>
           ))}
-        </>}
+        </div>}
 
-        {tab === 'leads' && <EnterpriseLeads />}
+        {tab === 'leads' && <div className="tab-content"><EnterpriseLeads /></div>}
 
       </div>
     </div>

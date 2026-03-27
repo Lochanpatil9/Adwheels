@@ -15,7 +15,172 @@ body {
 input, select, textarea, button { font-family: inherit; }
 a { text-decoration: none; color: inherit; }
 
-/* Loading screen */
+/* ═══════════════════════════════════════ */
+/*  Tab Content Fade-In Animation         */
+/* ═══════════════════════════════════════ */
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab-content {
+  animation: tabFadeIn .25s ease-out;
+}
+
+/* ═══════════════════════════════════════ */
+/*  Image Lightbox / Modal                */
+/* ═══════════════════════════════════════ */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: lightboxIn .2s ease-out;
+  cursor: zoom-out;
+}
+@keyframes lightboxIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.lightbox-overlay img {
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.5);
+}
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  font-size: 1.6rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s;
+}
+.lightbox-close:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* ═══════════════════════════════════════ */
+/*  Mobile Bottom Nav                     */
+/* ═══════════════════════════════════════ */
+.bottom-nav {
+  display: none;
+}
+@media (max-width: 640px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9000;
+    background: #fff;
+    border-top: 1px solid #EBEBEB;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    padding: 6px 4px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    gap: 2px;
+  }
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all .18s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .bottom-nav-item .nav-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+  .bottom-nav-item .nav-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 64px;
+  }
+  .bottom-nav-item--active {
+    background: #FFF8E6;
+  }
+  .bottom-nav-item--active .nav-label {
+    color: #D49800;
+  }
+  /* Hide top tabs on mobile when bottom nav is visible */
+  .hide-on-mobile-nav {
+    display: none !important;
+  }
+  /* Add bottom padding to page content so it's not hidden behind bottom nav */
+  .mobile-padded {
+    padding-bottom: 80px !important;
+  }
+}
+
+/* ═══════════════════════════════════════ */
+/*  Card Micro-Interactions               */
+/* ═══════════════════════════════════════ */
+.action-btn {
+  transition: all .18s ease;
+}
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+}
+
+/* ═══════════════════════════════════════ */
+/*  Search Input                          */
+/* ═══════════════════════════════════════ */
+.search-input {
+  width: 100%;
+  padding: 11px 14px 11px 38px;
+  font-size: 0.88rem;
+  border: 1.5px solid #E8E8E8;
+  border-radius: 12px;
+  background: #fff;
+  color: #111;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .2s, box-shadow .2s;
+}
+.search-input:focus {
+  border-color: #FFBF00;
+  box-shadow: 0 0 0 3px rgba(255,191,0,0.1);
+}
+.search-input::placeholder {
+  color: #bbb;
+}
+
+/* ═══════════════════════════════════════ */
+/*  Loading screen                        */
+/* ═══════════════════════════════════════ */
 .loading-screen {
   display: flex;
   align-items: center;
@@ -26,7 +191,9 @@ a { text-decoration: none; color: inherit; }
   background: #F5F5F5;
 }
 
-/* Auth */
+/* ═══════════════════════════════════════ */
+/*  Auth (used by ResetPasswordPage)      */
+/* ═══════════════════════════════════════ */
 .auth-page {
   min-height: 100vh;
   display: flex;
@@ -105,7 +272,9 @@ a { text-decoration: none; color: inherit; }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-full { width: 100%; margin-top: 8px; }
 
-/* Dashboard shared */
+/* ═══════════════════════════════════════ */
+/*  Dashboard shared                      */
+/* ═══════════════════════════════════════ */
 .dashboard { min-height: 100vh; background: #F5F5F5; color: #111; }
 .dash-nav {
   display: flex;
@@ -158,6 +327,17 @@ a { text-decoration: none; color: inherit; }
 }
 .dash-tab--active { color: #D49800; border-bottom-color: #FFBF00; }
 .dash-tab:hover:not(.dash-tab--active) { color: #555; }
+
+/* ═══════════════════════════════════════ */
+/*  Refresh Button                        */
+/* ═══════════════════════════════════════ */
+@keyframes spinRefresh {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.refresh-spin {
+  animation: spinRefresh .6s linear;
+}
 
 @media (max-width: 480px) {
   .dash-nav { padding: 0 14px; }

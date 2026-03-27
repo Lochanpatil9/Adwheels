@@ -1,196 +1,48 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, Upload, CheckCircle, XCircle, Wallet, Camera, Bell } from 'lucide-react'
+import { LogOut, Upload, CheckCircle, XCircle, Wallet, Camera, RefreshCw } from 'lucide-react'
 import { sendNotification } from '../lib/api'
+import NotificationBell from '../components/NotificationBell'
 
 /* ── Shared light-theme style helpers ── */
-const card  = { background:'#fff', border:'1px solid #E8E8E8', borderRadius:'16px', padding:'20px', marginBottom:'14px', boxShadow:'0 2px 8px rgba(0,0,0,0.05)' }
-const btn   = (bg='#FFBF00', col='#111') => ({ background:bg, color:col, border:'none', borderRadius:'12px', padding:'14px 20px', fontWeight:800, fontSize:'0.95rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', transition:'opacity .18s' })
-const inp   = { width:'100%', padding:'14px 15px', fontSize:'0.95rem', border:'1.5px solid #D8D8D8', borderRadius:'12px', background:'#fff', color:'#111', outline:'none', fontFamily:'inherit', marginBottom:'14px' }
+const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
+const btn = (bg = '#FFBF00', col = '#111') => ({ background: bg, color: col, border: 'none', borderRadius: '12px', padding: '14px 20px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all .18s' })
+const inp = { width: '100%', padding: '14px 15px', fontSize: '0.95rem', border: '1.5px solid #D8D8D8', borderRadius: '12px', background: '#fff', color: '#111', outline: 'none', fontFamily: 'inherit', marginBottom: '14px' }
 const badge = (s) => {
-  const m = { offered:['#FFF8E6','#7A5900'], active:['#E6F9EE','#0A6B30'], completed:['#F5F5F5','#666'], rejected:['#FDECEA','#C62828'], pending:['#FFF8E6','#7A5900'], approved:['#E6F9EE','#0A6B30'] }
-  const [bg,c] = m[s]||['#F5F5F5','#666']
-  return { display:'inline-block', background:bg, color:c, fontSize:'0.7rem', fontWeight:800, letterSpacing:'0.06em', textTransform:'uppercase', padding:'4px 10px', borderRadius:'100px' }
-}
-
-// ═══════════════════════════════════════════
-// NOTIFICATION BELL COMPONENT
-// ═══════════════════════════════════════════
-function NotificationBell({ userId }) {
-  const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [showDropdown, setShowDropdown] = useState(false)
-  const dropdownRef = useRef(null)
-  const hasShownUnreadToast = useRef(false)
-
-  useEffect(() => {
-    fetchNotifications()
-
-    // Subscribe to realtime notifications
-    const channel = supabase
-      .channel(`notifications-${userId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`
-      }, (payload) => {
-        const n = payload.new
-        setNotifications(prev => [n, ...prev].slice(0, 10))
-        setUnreadCount(prev => prev + 1)
-        toast(n.title, { icon: getNotifEmoji(n.type), duration: 4000 })
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [userId])
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowDropdown(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  async function fetchNotifications() {
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10)
-    const all = data || []
-    setNotifications(all)
-    const unread = all.filter(n => !n.is_read).length
-    setUnreadCount(unread)
-
-    // One-time toast about unread count on session load
-    if (unread > 0 && !hasShownUnreadToast.current) {
-      hasShownUnreadToast.current = true
-      toast(`You have ${unread} unread notification${unread > 1 ? 's' : ''}`, { icon: '🔔', duration: 3000 })
-    }
-  }
-
-  async function markAsRead(id) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-    setUnreadCount(prev => Math.max(0, prev - 1))
-  }
-
-  async function markAllRead() {
-    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id)
-    if (!unreadIds.length) return
-    await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds)
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
-    setUnreadCount(0)
-  }
-
-  function getNotifEmoji(type) {
-    const map = { job_offer: '🛺', proof_uploaded: '📸', campaign_expiring: '⏰', proof_approved: '✅', payout_sent: '💸' }
-    return map[type] || '🔔'
-  }
-
-  function timeAgo(dateStr) {
-    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
-    if (diff < 60) return 'Just now'
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-    return `${Math.floor(diff / 86400)}d ago`
-  }
-
-  return (
-    <div ref={dropdownRef} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: '6px', display: 'flex', alignItems: 'center' }}
-      >
-        <Bell size={20} color="#666" />
-        {unreadCount > 0 && (
-          <span style={{
-            position: 'absolute', top: '2px', right: '2px',
-            background: '#E53935', color: '#fff', fontSize: '0.6rem', fontWeight: 800,
-            width: '16px', height: '16px', borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            lineHeight: 1
-          }}>
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {showDropdown && (
-        <div style={{
-          position: 'absolute', top: '42px', right: 0, width: '320px',
-          background: '#fff', border: '1px solid #E8E8E8', borderRadius: '14px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.12)', zIndex: 200, overflow: 'hidden'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #F0F0F0' }}>
-            <div style={{ fontWeight: 800, fontSize: '0.92rem' }}>Notifications</div>
-            {unreadCount > 0 && (
-              <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: '#D49800', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
-                Mark all read
-              </button>
-            )}
-          </div>
-          <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
-            {notifications.length === 0
-              ? <div style={{ padding: '30px 16px', textAlign: 'center', color: '#bbb' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔕</div>
-                  <div style={{ fontSize: '0.84rem' }}>No notifications yet</div>
-                </div>
-              : notifications.map(n => (
-                  <div
-                    key={n.id}
-                    onClick={() => !n.is_read && markAsRead(n.id)}
-                    style={{
-                      padding: '12px 16px', borderBottom: '1px solid #F5F5F5',
-                      background: n.is_read ? '#fff' : '#FFFBEB',
-                      cursor: n.is_read ? 'default' : 'pointer',
-                      transition: 'background .2s'
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '1.2rem', flexShrink: 0, marginTop: '2px' }}>{getNotifEmoji(n.type)}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.84rem', marginBottom: '2px' }}>{n.title}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#666', lineHeight: 1.4 }}>{n.message}</div>
-                        <div style={{ fontSize: '0.68rem', color: '#aaa', marginTop: '4px' }}>{timeAgo(n.created_at)}</div>
-                      </div>
-                      {!n.is_read && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFBF00', flexShrink: 0, marginTop: '6px' }} />}
-                    </div>
-                  </div>
-                ))
-            }
-          </div>
-        </div>
-      )}
-    </div>
-  )
+  const m = { offered: ['#FFF8E6', '#7A5900'], active: ['#E6F9EE', '#0A6B30'], completed: ['#F5F5F5', '#666'], rejected: ['#FDECEA', '#C62828'], pending: ['#FFF8E6', '#7A5900'], approved: ['#E6F9EE', '#0A6B30'] }
+  const [bg, c] = m[s] || ['#F5F5F5', '#666']
+  return { display: 'inline-block', background: bg, color: c, fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: '100px' }
 }
 
 export default function DriverDashboard({ profile }) {
   const { signOut } = useAuth()
-  const [tab, setTab]             = useState('home')
-  const [jobs, setJobs]           = useState([])
-  const [earnings, setEarnings]   = useState([])
+  const [tab, setTab] = useState('home')
+  const [jobs, setJobs] = useState([])
+  const [earnings, setEarnings] = useState([])
   const [totalEarnings, setTotal] = useState(0)
   const [monthEarnings, setMonth] = useState(0)
-  const [totalPaidOut, setPaidOut]= useState(0)
+  const [totalPaidOut, setPaidOut] = useState(0)
   const [activeJob, setActiveJob] = useState(null)
-  const [todayProof, setTodayProof]   = useState(null)
-  const [proofFile, setProofFile]     = useState(null)
+  const [todayProof, setTodayProof] = useState(null)
+  const [proofFile, setProofFile] = useState(null)
   const [proofPreview, setProofPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutLoading, setPayoutLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() { await fetchJobs(); await fetchEarnings(); await fetchPayouts() }
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await fetchAll()
+    setTimeout(() => setRefreshing(false), 600)
+    toast.success('Data refreshed')
+  }
 
   async function fetchJobs() {
     const { data } = await supabase.from('driver_jobs')
@@ -213,20 +65,20 @@ export default function DriverDashboard({ profile }) {
       .eq('driver_id', profile.id).order('earning_date', { ascending: false })
     const all = data || []
     setEarnings(all)
-    setTotal(all.reduce((s,e) => s + e.amount, 0))
-    const m = new Date().toISOString().slice(0,7)
-    setMonth(all.filter(e => e.earning_date?.startsWith(m)).reduce((s,e) => s + e.amount, 0))
+    setTotal(all.reduce((s, e) => s + e.amount, 0))
+    const m = new Date().toISOString().slice(0, 7)
+    setMonth(all.filter(e => e.earning_date?.startsWith(m)).reduce((s, e) => s + e.amount, 0))
   }
 
   async function fetchPayouts() {
     const { data } = await supabase.from('payouts').select('amount,status')
-      .eq('driver_id', profile.id).in('status', ['paid','requested'])
-    setPaidOut((data||[]).reduce((s,p) => s + p.amount, 0))
+      .eq('driver_id', profile.id).in('status', ['paid', 'requested'])
+    setPaidOut((data || []).reduce((s, p) => s + p.amount, 0))
   }
 
   async function handleAcceptJob(jobId) {
     const { error } = await supabase.from('driver_jobs')
-      .update({ status:'active', accepted_at: new Date().toISOString() })
+      .update({ status: 'active', accepted_at: new Date().toISOString() })
       .eq('id', jobId).eq('driver_id', profile.id)
     if (error) return toast.error(error.message)
     toast.success('Job accepted! 🎉 Print the banner and install it.')
@@ -234,7 +86,8 @@ export default function DriverDashboard({ profile }) {
   }
 
   async function handleRejectJob(jobId) {
-    const { error } = await supabase.from('driver_jobs').update({ status:'rejected' }).eq('id', jobId)
+    if (!window.confirm('Pass on this job? You can always accept future offers.')) return
+    const { error } = await supabase.from('driver_jobs').update({ status: 'rejected' }).eq('id', jobId)
     if (error) return toast.error(error.message)
     toast.success('Job passed'); await fetchAll()
   }
@@ -261,7 +114,6 @@ export default function DriverDashboard({ profile }) {
     if (error) { toast.error(error.message); setUploading(false); return }
     toast.success('Photo submitted! ✅ Admin will review it.')
 
-    // Trigger 2 — Notify advertiser about proof upload
     try {
       const { data: campaign } = await supabase
         .from('campaigns')
@@ -298,139 +150,190 @@ export default function DriverDashboard({ profile }) {
   }
 
   const offeredJobs = jobs.filter(j => j.status === 'offered')
-  const historyJobs = jobs.filter(j => !['offered','active'].includes(j.status))
+  const historyJobs = jobs.filter(j => !['offered', 'active'].includes(j.status))
   const balance = totalEarnings - totalPaidOut
 
+  // Calculate streak
+  const streak = (() => {
+    if (!earnings.length) return 0
+    let count = 0
+    const today = new Date()
+    for (let i = 0; i < Math.min(earnings.length, 60); i++) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      const dateStr = d.toISOString().split('T')[0]
+      if (earnings.some(e => e.earning_date === dateStr)) count++
+      else break
+    }
+    return count
+  })()
+
   const TABS = [
-    { key:'home',    label:'🏠 Home' },
-    { key:'jobs',    label: offeredJobs.length ? `💼 Jobs (${offeredJobs.length})` : '💼 Jobs' },
-    { key:'proof',   label: activeJob && !todayProof ? '📸 Proof ⚠️' : '📸 Proof' },
-    { key:'earning', label:'💰 Earnings' },
-    { key:'payout',  label:'💳 Payout' },
+    { key: 'home', icon: '🏠', label: 'Home' },
+    { key: 'jobs', icon: '💼', label: offeredJobs.length ? `Jobs (${offeredJobs.length})` : 'Jobs' },
+    { key: 'proof', icon: '📸', label: activeJob && !todayProof ? 'Proof ⚠️' : 'Proof' },
+    { key: 'earning', icon: '💰', label: 'Earnings' },
+    { key: 'payout', icon: '💳', label: 'Payout' },
   ]
 
   return (
-    <div style={{ minHeight:'100vh', background:'#F5F5F5', color:'#111', fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#F5F5F5', color: '#111', fontFamily: "'DM Sans',sans-serif" }} className="mobile-padded">
 
       {/* NAV */}
-      <div style={{ background:'#fff', borderBottom:'1px solid #EBEBEB', padding:'0 18px', height:'58px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100, boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'1.7rem', color:'#FFBF00', letterSpacing:'0.05em' }}>AdWheels</div>
-        <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', padding: '0 18px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: '#FFBF00', letterSpacing: '0.05em' }}>AdWheels</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={handleRefresh} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888' }} title="Refresh data">
+            <RefreshCw size={14} className={refreshing ? 'refresh-spin' : ''} />
+          </button>
           <NotificationBell userId={profile.id} />
-          <span style={{ fontSize:'0.84rem', color:'#666' }}>👋 {profile.full_name}</span>
-          <button onClick={signOut} style={{ background:'none', border:'1.5px solid #E8E8E8', borderRadius:'8px', padding:'6px 12px', fontSize:'0.82rem', color:'#888', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px' }}>
-            <LogOut size={13}/> Logout
+          <span style={{ fontSize: '0.84rem', color: '#666' }}>👋 {profile.full_name}</span>
+          <button onClick={signOut} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 12px', fontSize: '0.82rem', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <LogOut size={13} /> Logout
           </button>
         </div>
       </div>
 
       {/* GREETING BANNER */}
-      <div style={{ background:'linear-gradient(135deg,#FFBF00,#FF8C00)', padding:'20px 18px 18px', color:'#111' }}>
-        <div style={{ fontSize:'0.83rem', opacity:0.65, marginBottom:'2px' }}>Welcome back,</div>
-        <div style={{ fontFamily:'Syne,sans-serif', fontWeight:800, fontSize:'1.25rem' }}>{profile.full_name} 👋</div>
-        <div style={{ fontSize:'0.82rem', marginTop:'3px', opacity:0.7 }}>🛺 Driver · {profile.city}</div>
+      <div style={{ background: 'linear-gradient(135deg,#FFBF00,#FF8C00)', padding: '20px 18px 18px', color: '#111' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: '0.83rem', opacity: 0.65, marginBottom: '2px' }}>Welcome back,</div>
+            <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '1.25rem' }}>{profile.full_name} 👋</div>
+            <div style={{ fontSize: '0.82rem', marginTop: '3px', opacity: 0.7 }}>🛺 Driver · {profile.city}</div>
+          </div>
+          {streak > 0 && (
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '12px', padding: '8px 14px', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.5rem', lineHeight: 1, color: '#111' }}>{streak}</div>
+              <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7 }}>Day Streak 🔥</div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* TABS */}
-      <div style={{ background:'#fff', borderBottom:'1px solid #EBEBEB', display:'flex', overflowX:'auto', scrollbarWidth:'none', padding:'0 6px' }}>
+      {/* TOP TABS — hidden on mobile when bottom nav is visible */}
+      <div className="hide-on-mobile-nav" style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', padding: '0 6px' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding:'13px 14px', border:'none', background:'none', fontSize:'0.82rem', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', color:tab===t.key?'#D49800':'#999', borderBottom:tab===t.key?'2.5px solid #FFBF00':'2.5px solid transparent', flexShrink:0 }}>
-            {t.label}
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 14px', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#D49800' : '#999', borderBottom: tab === t.key ? '2.5px solid #FFBF00' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s' }}>
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
 
-      <div style={{ padding:'16px', maxWidth:'640px', margin:'0 auto' }}>
+      {/* MOBILE BOTTOM NAV */}
+      <div className="bottom-nav">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`bottom-nav-item${tab === t.key ? ' bottom-nav-item--active' : ''}`}
+          >
+            <span className="nav-icon">{t.icon}</span>
+            <span className="nav-label" style={{ color: tab === t.key ? '#D49800' : '#999' }}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: '16px', maxWidth: '640px', margin: '0 auto' }}>
 
         {/* ── HOME ── */}
-        {tab === 'home' && <>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'14px' }}>
+        {tab === 'home' && <div className="tab-content">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
             <div style={card}>
-              <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'2rem', color:'#1DB954', lineHeight:1 }}>₹{monthEarnings}</div>
-              <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#888', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:'4px' }}>This Month</div>
+              <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2rem', color: '#1DB954', lineHeight: 1 }}>₹{monthEarnings}</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>This Month</div>
             </div>
             <div style={card}>
-              <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'2rem', color:'#D49800', lineHeight:1 }}>₹{totalEarnings}</div>
-              <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#888', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:'4px' }}>Total Earned</div>
+              <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2rem', color: '#D49800', lineHeight: 1 }}>₹{totalEarnings}</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>Total Earned</div>
             </div>
           </div>
 
           {offeredJobs.length > 0 && (
-            <div onClick={() => setTab('jobs')} style={{ background:'#FFF8E6', border:'1.5px solid #FFE08A', borderRadius:'14px', padding:'16px 18px', marginBottom:'14px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div onClick={() => setTab('jobs')} style={{ background: '#FFF8E6', border: '1.5px solid #FFE08A', borderRadius: '14px', padding: '16px 18px', marginBottom: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
               <div>
-                <div style={{ fontWeight:800, fontSize:'0.95rem', color:'#7A5900' }}>🔔 New Job Available!</div>
-                <div style={{ fontSize:'0.83rem', color:'#999', marginTop:'2px' }}>Tap to see details and earn money</div>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#7A5900' }}>🔔 New Job Available!</div>
+                <div style={{ fontSize: '0.83rem', color: '#999', marginTop: '2px' }}>Tap to see details and earn money</div>
               </div>
-              <span style={{ fontSize:'1.4rem', color:'#D49800' }}>→</span>
+              <span style={{ fontSize: '1.4rem', color: '#D49800' }}>→</span>
             </div>
           )}
 
           {activeJob ? (
-            <div style={{ ...card, border:'1.5px solid #A3E4BE' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
-                <span style={{ width:'9px', height:'9px', background:'#1DB954', borderRadius:'50%', display:'inline-block' }}/>
-                <span style={{ fontWeight:800, color:'#0A6B30', fontSize:'0.93rem' }}>Active Job Running</span>
+            <div style={{ ...card, border: '1.5px solid #A3E4BE' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <span style={{ width: '9px', height: '9px', background: '#1DB954', borderRadius: '50%', display: 'inline-block' }} />
+                <span style={{ fontWeight: 800, color: '#0A6B30', fontSize: '0.93rem' }}>Active Job Running</span>
               </div>
-              <div style={{ fontSize:'0.87rem', color:'#555', marginBottom:'4px' }}>📍 {activeJob.campaigns?.city} — {activeJob.campaigns?.area}</div>
-              <div style={{ fontSize:'0.87rem', color:'#555', marginBottom:'14px' }}>💰 ₹{activeJob.campaigns?.plans?.driver_payout}/month + ₹175 for printing</div>
+              <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '4px' }}>📍 {activeJob.campaigns?.city} — {activeJob.campaigns?.area}</div>
+              <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '14px' }}>💰 ₹{activeJob.campaigns?.plans?.driver_payout}/month + ₹175 for printing</div>
+
+              {/* Banner preview */}
+              {activeJob.campaigns?.banner_url && (
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Your Ad Banner</div>
+                  <img src={activeJob.campaigns.banner_url} alt="campaign banner" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '10px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
+                </div>
+              )}
+
               {todayProof
-                ? <div style={{ background:'#E6F9EE', borderRadius:'10px', padding:'10px 14px', fontSize:'0.87rem', color:'#0A6B30', fontWeight:700 }}>✅ Today's photo submitted — {todayProof.status}</div>
-                : <div onClick={() => setTab('proof')} style={{ background:'#FFF8E6', borderRadius:'10px', padding:'12px 14px', fontSize:'0.87rem', color:'#7A5900', fontWeight:700, cursor:'pointer', textAlign:'center' }}>
-                    📸 Upload today's photo to earn today →
-                  </div>
+                ? <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '10px 14px', fontSize: '0.87rem', color: '#0A6B30', fontWeight: 700 }}>✅ Today's photo submitted — {todayProof.status}</div>
+                : <div onClick={() => setTab('proof')} style={{ background: '#FFF8E6', borderRadius: '10px', padding: '12px 14px', fontSize: '0.87rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', textAlign: 'center', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                  📸 Upload today's photo to earn today →
+                </div>
               }
             </div>
           ) : !offeredJobs.length && (
-            <div style={{ textAlign:'center', padding:'48px 16px', color:'#bbb' }}>
-              <div style={{ fontSize:'3rem', marginBottom:'10px' }}>🛺</div>
-              <div style={{ fontWeight:700, color:'#999', fontSize:'1rem', marginBottom:'4px' }}>No jobs yet</div>
-              <div style={{ fontSize:'0.84rem' }}>We'll notify you when a job is available!</div>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🛺</div>
+              <div style={{ fontWeight: 700, color: '#999', fontSize: '1rem', marginBottom: '4px' }}>No jobs yet</div>
+              <div style={{ fontSize: '0.84rem' }}>We'll notify you when a job is available!</div>
             </div>
           )}
 
-          <div style={{ background:'#EFF6FF', border:'1px solid #BBDEFB', borderRadius:'12px', padding:'13px 16px', fontSize:'0.84rem', color:'#1565C0' }}>
+          <div style={{ background: '#EFF6FF', border: '1px solid #BBDEFB', borderRadius: '12px', padding: '13px 16px', fontSize: '0.84rem', color: '#1565C0', marginTop: '10px' }}>
             💡 <b>Remember:</b> Upload your rickshaw photo every day to get paid. No photo = no earning for that day.
           </div>
-        </>}
+        </div>}
 
         {/* ── JOBS ── */}
-        {tab === 'jobs' && <>
+        {tab === 'jobs' && <div className="tab-content">
           {offeredJobs.length > 0 && <>
-            <div style={{ fontWeight:800, fontSize:'1rem', marginBottom:'14px', color:'#111' }}>New Job Offers</div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '14px', color: '#111' }}>New Job Offers</div>
             {offeredJobs.map(job => (
-              <div key={job.id} style={{ ...card, border:'1.5px solid #FFE08A' }}>
+              <div key={job.id} style={{ ...card, border: '1.5px solid #FFE08A' }}>
                 {job.campaigns?.plans?.is_urgent && (
-                  <div style={{ background:'#FDECEA', color:'#C62828', fontSize:'0.72rem', fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase', padding:'4px 10px', borderRadius:'6px', display:'inline-block', marginBottom:'10px' }}>⚡ Urgent</div>
+                  <div style={{ background: '#FDECEA', color: '#C62828', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: '6px', display: 'inline-block', marginBottom: '10px' }}>⚡ Urgent</div>
                 )}
-                <div style={{ fontWeight:800, fontSize:'0.95rem', marginBottom:'4px', color:'#111' }}>{job.campaigns?.plans?.name} Plan</div>
-                <div style={{ fontSize:'0.87rem', color:'#666', marginBottom:'14px' }}>📍 {job.campaigns?.city} — {job.campaigns?.area}</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'14px' }}>
-                  <div style={{ background:'#E6F9EE', borderRadius:'10px', padding:'14px', textAlign:'center' }}>
-                    <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'1.6rem', color:'#0A6B30' }}>₹{job.campaigns?.plans?.driver_payout}</div>
-                    <div style={{ fontSize:'0.7rem', color:'#666', textTransform:'uppercase', letterSpacing:'0.05em' }}>Per Month</div>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '4px', color: '#111' }}>{job.campaigns?.plans?.name} Plan</div>
+                <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '14px' }}>📍 {job.campaigns?.city} — {job.campaigns?.area}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.6rem', color: '#0A6B30' }}>₹{job.campaigns?.plans?.driver_payout}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per Month</div>
                   </div>
-                  <div style={{ background:'#FFF8E6', borderRadius:'10px', padding:'14px', textAlign:'center' }}>
-                    <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'1.6rem', color:'#7A5900' }}>+₹175</div>
-                    <div style={{ fontSize:'0.7rem', color:'#666', textTransform:'uppercase', letterSpacing:'0.05em' }}>Print Money</div>
+                  <div style={{ background: '#FFF8E6', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.6rem', color: '#7A5900' }}>+₹175</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Print Money</div>
                   </div>
                 </div>
-                {job.campaigns?.banner_url && <img src={job.campaigns.banner_url} alt="banner" style={{ width:'100%', maxHeight:'90px', objectFit:'contain', borderRadius:'8px', border:'1px solid #E8E8E8', marginBottom:'14px', background:'#fafafa' }}/>}
-                <div style={{ display:'flex', gap:'10px' }}>
-                  <button onClick={() => handleAcceptJob(job.id)} style={{ ...btn('#1DB954','#fff'), flex:1, justifyContent:'center' }}><CheckCircle size={16}/> Accept Job</button>
-                  <button onClick={() => handleRejectJob(job.id)} style={{ background:'#FDECEA', color:'#C62828', border:'1.5px solid #FFAAAA', borderRadius:'12px', padding:'12px 16px', fontWeight:700, fontSize:'0.88rem', cursor:'pointer', display:'flex', alignItems:'center', gap:'6px' }}><XCircle size={15}/> Pass</button>
+                {job.campaigns?.banner_url && <img src={job.campaigns.banner_url} alt="banner" style={{ width: '100%', maxHeight: '90px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E8E8E8', marginBottom: '14px', background: '#fafafa' }} />}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="action-btn" onClick={() => handleAcceptJob(job.id)} style={{ ...btn('#1DB954', '#fff'), flex: 1, justifyContent: 'center' }}><CheckCircle size={16} /> Accept Job</button>
+                  <button className="action-btn" onClick={() => handleRejectJob(job.id)} style={{ background: '#FDECEA', color: '#C62828', border: '1.5px solid #FFAAAA', borderRadius: '12px', padding: '12px 16px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><XCircle size={15} /> Pass</button>
                 </div>
               </div>
             ))}
           </>}
 
           {historyJobs.length > 0 && <>
-            <div style={{ fontWeight:800, fontSize:'1rem', margin:'20px 0 12px', color:'#111' }}>Past Jobs</div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', margin: '20px 0 12px', color: '#111' }}>Past Jobs</div>
             {historyJobs.map(job => (
               <div key={job.id} style={card}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight:700, fontSize:'0.93rem', marginBottom:'3px' }}>{job.campaigns?.plans?.name} · {job.campaigns?.city}</div>
-                    <div style={{ fontSize:'0.82rem', color:'#999' }}>{job.campaigns?.area}</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.93rem', marginBottom: '3px' }}>{job.campaigns?.plans?.name} · {job.campaigns?.city}</div>
+                    <div style={{ fontSize: '0.82rem', color: '#999' }}>{job.campaigns?.area}</div>
                   </div>
                   <span style={badge(job.status)}>{job.status}</span>
                 </div>
@@ -439,103 +342,118 @@ export default function DriverDashboard({ profile }) {
           </>}
 
           {jobs.length === 0 && (
-            <div style={{ textAlign:'center', padding:'48px 16px', color:'#bbb' }}>
-              <div style={{ fontSize:'3rem', marginBottom:'10px' }}>📭</div>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📭</div>
               <div>No jobs yet — we'll assign one soon!</div>
             </div>
           )}
-        </>}
+        </div>}
 
         {/* ── PROOF ── */}
-        {tab === 'proof' && <>
+        {tab === 'proof' && <div className="tab-content">
           {!activeJob
-            ? <div style={{ textAlign:'center', padding:'48px 16px', color:'#bbb' }}>
-                <div style={{ fontSize:'3rem', marginBottom:'10px' }}>📷</div>
-                <div style={{ fontWeight:700, fontSize:'1rem', color:'#999', marginBottom:'6px' }}>No active job</div>
-                <div style={{ fontSize:'0.84rem' }}>Accept a job first, then upload your photo here</div>
-              </div>
+            ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📷</div>
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: '#999', marginBottom: '6px' }}>No active job</div>
+              <div style={{ fontSize: '0.84rem', marginBottom: '16px' }}>Accept a job first, then upload your photo here</div>
+              {offeredJobs.length > 0 && (
+                <button className="action-btn" onClick={() => setTab('jobs')} style={{ ...btn('#FFBF00', '#111'), margin: '0 auto' }}>View Job Offers →</button>
+              )}
+            </div>
             : <div style={card}>
-                <div style={{ fontWeight:800, fontSize:'1rem', marginBottom:'6px' }}>📸 Today's Photo</div>
-                <div style={{ fontSize:'0.87rem', color:'#666', marginBottom:'16px', lineHeight:1.6 }}>
-                  Take a clear photo of the ad banner on your rickshaw.<br/>
-                  <b style={{ color:'#111' }}>No photo = no earning today.</b>
-                </div>
-                {todayProof
-                  ? <div style={{ background:'#E6F9EE', border:'1px solid #A3E4BE', borderRadius:'12px', padding:'16px' }}>
-                      <div style={{ color:'#0A6B30', fontWeight:800, marginBottom:'10px' }}>✅ Photo submitted — {todayProof.status}</div>
-                      <img src={todayProof.photo_url} alt="proof" style={{ maxWidth:'100%', maxHeight:'220px', objectFit:'contain', borderRadius:'8px' }}/>
-                    </div>
-                  : <>
-                      <label htmlFor="proofInput" style={{ cursor:'pointer', display:'block' }}>
-                        <div style={{ border:'2px dashed #1DB954', borderRadius:'14px', padding:'36px 20px', textAlign:'center', background:'#F0FFF6' }}>
-                          {proofPreview
-                            ? <img src={proofPreview} alt="preview" style={{ maxHeight:'180px', maxWidth:'100%', borderRadius:'8px' }}/>
-                            : <>
-                                <Camera size={40} style={{ color:'#1DB954', marginBottom:'12px' }}/>
-                                <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:'6px' }}>Tap to take / upload photo</div>
-                                <div style={{ fontSize:'0.82rem', color:'#888' }}>Show the banner on your rickshaw clearly</div>
-                              </>
-                          }
-                        </div>
-                      </label>
-                      <input id="proofInput" type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={handleProofSelect}/>
-                      {proofPreview && (
-                        <button onClick={handleUploadProof} disabled={uploading} style={{ ...btn('#1DB954','#fff'), width:'100%', justifyContent:'center', marginTop:'14px', opacity:uploading?.6:1 }}>
-                          {uploading ? 'Uploading…' : <><Upload size={16}/> Submit Photo</>}
-                        </button>
-                      )}
-                    </>
-                }
+              <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '6px' }}>📸 Today's Photo</div>
+              <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '16px', lineHeight: 1.6 }}>
+                Take a clear photo of the ad banner on your rickshaw.<br />
+                <b style={{ color: '#111' }}>No photo = no earning today.</b>
               </div>
+              {todayProof
+                ? <div style={{ background: '#E6F9EE', border: '1px solid #A3E4BE', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ color: '#0A6B30', fontWeight: 800, marginBottom: '10px' }}>✅ Photo submitted — {todayProof.status}</div>
+                  <img src={todayProof.photo_url} alt="proof" style={{ maxWidth: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: '8px' }} />
+                </div>
+                : <>
+                  <label htmlFor="proofInput" style={{ cursor: 'pointer', display: 'block' }}>
+                    <div style={{ border: '2px dashed #1DB954', borderRadius: '14px', padding: '36px 20px', textAlign: 'center', background: '#F0FFF6', transition: 'background .2s' }}>
+                      {proofPreview
+                        ? <img src={proofPreview} alt="preview" style={{ maxHeight: '180px', maxWidth: '100%', borderRadius: '8px' }} />
+                        : <>
+                          <Camera size={40} style={{ color: '#1DB954', marginBottom: '12px' }} />
+                          <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '6px' }}>Tap to take / upload photo</div>
+                          <div style={{ fontSize: '0.82rem', color: '#888' }}>Show the banner on your rickshaw clearly</div>
+                        </>
+                      }
+                    </div>
+                  </label>
+                  <input id="proofInput" type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleProofSelect} />
+                  {proofPreview && (
+                    <button className="action-btn" onClick={handleUploadProof} disabled={uploading} style={{ ...btn('#1DB954', '#fff'), width: '100%', justifyContent: 'center', marginTop: '14px', opacity: uploading ? .6 : 1 }}>
+                      {uploading ? 'Uploading…' : <><Upload size={16} /> Submit Photo</>}
+                    </button>
+                  )}
+                </>
+              }
+            </div>
           }
-        </>}
+        </div>}
 
         {/* ── EARNINGS ── */}
-        {tab === 'earning' && <>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'10px', marginBottom:'16px' }}>
-            {[{n:`₹${monthEarnings}`,l:'This Month',c:'#1DB954'},{n:`₹${totalEarnings}`,l:'All Time',c:'#D49800'},{n:earnings.length,l:'Days',c:'#555'}].map(x=>(
+        {tab === 'earning' && <div className="tab-content">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+            {[{ n: `₹${monthEarnings}`, l: 'This Month', c: '#1DB954' }, { n: `₹${totalEarnings}`, l: 'All Time', c: '#D49800' }, { n: earnings.length, l: 'Days', c: '#555' }].map(x => (
               <div key={x.l} style={card}>
-                <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'1.7rem', color:x.c, lineHeight:1 }}>{x.n}</div>
-                <div style={{ fontSize:'0.7rem', fontWeight:700, color:'#888', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:'4px' }}>{x.l}</div>
+                <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: x.c, lineHeight: 1 }}>{x.n}</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>{x.l}</div>
               </div>
             ))}
           </div>
-          {earnings.length === 0
-            ? <div style={{ textAlign:'center', padding:'48px 16px', color:'#bbb' }}><div style={{ fontSize:'3rem', marginBottom:'10px' }}>💸</div><div>No earnings yet — accept a job and upload daily photos!</div></div>
-            : <div style={{ background:'#fff', borderRadius:'16px', overflow:'hidden', border:'1px solid #E8E8E8' }}>
-                {earnings.slice(0,40).map((e,i) => (
-                  <div key={e.id} style={{ padding:'14px 16px', borderBottom: i < earnings.length-1 ? '1px solid #F0F0F0' : 'none', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div>
-                      <div style={{ fontWeight:600, fontSize:'0.92rem' }}>{e.type==='daily'?'📅 Daily earning':e.type==='print_reimbursement'?'🖨️ Print money':'🎁 Bonus'}</div>
-                      <div style={{ fontSize:'0.78rem', color:'#aaa', marginTop:'2px' }}>{e.earning_date}</div>
-                    </div>
-                    <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'1.3rem', color:'#1DB954' }}>+₹{e.amount}</div>
-                  </div>
-                ))}
+
+          {/* Streak badge */}
+          {streak > 0 && (
+            <div style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '12px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.8rem', color: '#D49800', lineHeight: 1 }}>{streak}</div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#7A5900' }}>Day Streak 🔥</div>
+                <div style={{ fontSize: '0.78rem', color: '#999' }}>Keep uploading daily to maintain it!</div>
               </div>
+            </div>
+          )}
+
+          {earnings.length === 0
+            ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>💸</div><div>No earnings yet — accept a job and upload daily photos!</div></div>
+            : <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', border: '1px solid #E8E8E8' }}>
+              {earnings.slice(0, 40).map((e, i) => (
+                <div key={e.id} style={{ padding: '14px 16px', borderBottom: i < earnings.length - 1 ? '1px solid #F0F0F0' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{e.type === 'daily' ? '📅 Daily earning' : e.type === 'print_reimbursement' ? '🖨️ Print money' : '🎁 Bonus'}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#aaa', marginTop: '2px' }}>{e.earning_date}</div>
+                  </div>
+                  <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.3rem', color: '#1DB954' }}>+₹{e.amount}</div>
+                </div>
+              ))}
+            </div>
           }
-        </>}
+        </div>}
 
         {/* ── PAYOUT ── */}
-        {tab === 'payout' && <>
-          <div style={{ background:'linear-gradient(135deg,#1DB954,#0E9E42)', borderRadius:'16px', padding:'22px', marginBottom:'14px', color:'#fff' }}>
-            <div style={{ fontSize:'0.75rem', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', opacity:.8, marginBottom:'6px' }}>Available Balance</div>
-            <div style={{ fontFamily:'Bebas Neue,sans-serif', fontSize:'2.8rem', lineHeight:1, marginBottom:'4px' }}>₹{balance}</div>
-            <div style={{ fontSize:'0.82rem', opacity:.75 }}>UPI: {profile.upi_id || 'Not set — contact admin'}</div>
+        {tab === 'payout' && <div className="tab-content">
+          <div style={{ background: 'linear-gradient(135deg,#1DB954,#0E9E42)', borderRadius: '16px', padding: '22px', marginBottom: '14px', color: '#fff' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: .8, marginBottom: '6px' }}>Available Balance</div>
+            <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2.8rem', lineHeight: 1, marginBottom: '4px' }}>₹{balance}</div>
+            <div style={{ fontSize: '0.82rem', opacity: .75 }}>UPI: {profile.upi_id || 'Not set — contact admin'}</div>
           </div>
           <div style={card}>
-            <div style={{ fontWeight:800, fontSize:'1rem', marginBottom:'4px' }}>Request Payout</div>
-            <div style={{ fontSize:'0.85rem', color:'#888', marginBottom:'16px' }}>Minimum ₹500 · Paid to your UPI in 1–2 days</div>
-            <label style={{ display:'block', fontWeight:600, fontSize:'0.88rem', marginBottom:'6px', color:'#444' }}>Amount (₹)</label>
-            <input type="number" placeholder="Enter amount (min ₹500)" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} style={inp}/>
-            <button onClick={handleRequestPayout} disabled={payoutLoading} style={{ ...btn('#1DB954','#fff'), width:'100%', justifyContent:'center', opacity:payoutLoading?.6:1 }}>
-              {payoutLoading ? 'Requesting…' : <><Wallet size={16}/> Request Payout</>}
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '4px' }}>Request Payout</div>
+            <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '16px' }}>Minimum ₹500 · Paid to your UPI in 1–2 days</div>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px', color: '#444' }}>Amount (₹)</label>
+            <input type="number" placeholder="Enter amount (min ₹500)" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} style={inp} />
+            <button className="action-btn" onClick={handleRequestPayout} disabled={payoutLoading} style={{ ...btn('#1DB954', '#fff'), width: '100%', justifyContent: 'center', opacity: payoutLoading ? .6 : 1 }}>
+              {payoutLoading ? 'Requesting…' : <><Wallet size={16} /> Request Payout</>}
             </button>
           </div>
-          <div style={{ background:'#FFF8E6', border:'1px solid #FFE08A', borderRadius:'12px', padding:'13px 16px', fontSize:'0.84rem', color:'#7A5900' }}>
+          <div style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '13px 16px', fontSize: '0.84rem', color: '#7A5900' }}>
             💡 Earnings are credited only after admin approves your daily photo. Upload every day!
           </div>
-        </>}
+        </div>}
 
       </div>
     </div>
