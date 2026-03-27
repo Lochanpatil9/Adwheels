@@ -6,6 +6,5 @@ node_modules/
 dist/
 *.log
 .claude/
-.claude/
 CLAUDE.md
 fix_colors.js
