@@ -43,12 +43,15 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
     }
     const {data,error} = await supabase.auth.signUp({email:form.email,password:form.password,options:{data:{full_name:form.full_name,role}}})
     if (error) { toast.error(error.message); setBusy(false); return }
-    const {error:pe} = await supabase.from('users').insert({id:data.user.id,full_name:form.full_name,phone:form.phone,city:form.city,role,upi_id:form.upi_id||null,vehicle_number:form.vehicle_number||null})
-    if (pe) toast.error(pe.message)
+    // Use upsert to handle possible auth trigger that auto-creates user row
+    const {error:pe} = await supabase.from('users').upsert({id:data.user.id,full_name:form.full_name,phone:form.phone,city:form.city,role,upi_id:form.upi_id||null,vehicle_number:form.vehicle_number||null},{onConflict:'id'})
+    if (pe) { console.error('Profile save error:', pe); toast.error('Profile save failed: ' + pe.message) }
     // Auto-login immediately after signup (no email verification needed)
-    const {error:loginErr} = await supabase.auth.signInWithPassword({email:form.email,password:form.password})
-    if (loginErr) toast.error('Account created but auto-login failed: ' + loginErr.message)
-    else toast.success('Account created! Welcome to AdWheels 🎉')
+    try {
+      const {error:loginErr} = await supabase.auth.signInWithPassword({email:form.email,password:form.password})
+      if (loginErr) toast.error('Account created but auto-login failed: ' + loginErr.message)
+      else toast.success('Account created! Welcome to AdWheels 🎉')
+    } catch(e) { toast.error('Account created! Please login manually.') }
     setBusy(false)
   }
 

@@ -74,3 +74,22 @@ export async function sendNotification({ userId, type, title, message }) {
   return res.json()
 }
 
+export async function autoAssignNewDriver(driverId) {
+  const res = await fetch(`${API_BASE}/api/drivers/on-verified`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ driverId }),
+  })
+  if (!res.ok) throw new Error('Failed to auto-assign driver')
+  return res.json()
+}
+
+export async function autoAssignAll() {
+  const res = await fetch(`${API_BASE}/api/drivers/auto-assign-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) throw new Error('Failed to bulk auto-assign')
+  return res.json()
+}
+

@@ -396,10 +396,10 @@ export default function DriverDashboard({ profile }) {
           }
         </div>}
 
-        {/* ── EARNINGS ── */}
+        {/* ── EARNINGS — Enhanced ── */}
         {tab === 'earning' && <div className="tab-content">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-            {[{ n: `₹${monthEarnings}`, l: 'This Month', c: '#1DB954' }, { n: `₹${totalEarnings}`, l: 'All Time', c: '#D49800' }, { n: earnings.length, l: 'Days', c: '#555' }].map(x => (
+            {[{ n: `₹${monthEarnings}`, l: 'This Month', c: '#1DB954' }, { n: `₹${totalEarnings}`, l: 'All Time', c: '#D49800' }, { n: earnings.length, l: 'Days Earned', c: '#555' }].map(x => (
               <div key={x.l} style={card}>
                 <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: x.c, lineHeight: 1 }}>{x.n}</div>
                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>{x.l}</div>
@@ -407,16 +407,53 @@ export default function DriverDashboard({ profile }) {
             ))}
           </div>
 
-          {/* Streak badge */}
+          {/* Streak + Milestone badges */}
           {streak > 0 && (
-            <div style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '12px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.8rem', color: '#D49800', lineHeight: 1 }}>{streak}</div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#7A5900' }}>Day Streak 🔥</div>
-                <div style={{ fontSize: '0.78rem', color: '#999' }}>Keep uploading daily to maintain it!</div>
+            <div style={{ background: 'linear-gradient(135deg,#FFF8E6,#FFF0D0)', border: '1.5px solid #FFE08A', borderRadius: '14px', padding: '16px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
+                <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2.2rem', color: '#D49800', lineHeight: 1 }}>{streak}</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#7A5900' }}>Day Streak 🔥</div>
+                  <div style={{ fontSize: '0.78rem', color: '#999' }}>Keep uploading daily!</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[{ d: 7, e: '🥉', l: '7 Days' }, { d: 14, e: '🥈', l: '14 Days' }, { d: 30, e: '🥇', l: '30 Days' }].map(m => (
+                  <div key={m.d} style={{ background: streak >= m.d ? '#1DB954' : '#E8E8E8', color: streak >= m.d ? '#fff' : '#bbb', borderRadius: '100px', padding: '5px 12px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {m.e} {m.l} {streak >= m.d ? '✓' : ''}
+                  </div>
+                ))}
               </div>
             </div>
           )}
+
+          {/* Earning Calendar — last 30 days */}
+          <div style={{ ...card, padding: '16px', marginBottom: '14px' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '10px' }}>📅 Last 30 Days</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px' }}>
+              {Array.from({ length: 30 }, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (29 - i))
+                const dateStr = d.toISOString().split('T')[0]
+                const earned = earnings.find(e => e.earning_date === dateStr)
+                const isToday = dateStr === new Date().toISOString().split('T')[0]
+                return (
+                  <div key={dateStr} title={`${dateStr}${earned ? ` — ₹${earned.amount}` : ''}`} style={{
+                    aspectRatio: '1', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: earned ? '#1DB954' : isToday ? '#FFF8E6' : '#F5F5F5',
+                    color: earned ? '#fff' : isToday ? '#D49800' : '#ccc',
+                    fontSize: '0.6rem', fontWeight: 700, border: isToday ? '2px solid #FFBF00' : '1px solid transparent',
+                    cursor: 'default'
+                  }}>
+                    {d.getDate()}
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '0.68rem', color: '#888' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '3px', background: '#1DB954', display: 'inline-block' }} /> Earned</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '3px', background: '#F5F5F5', border: '1px solid #E8E8E8', display: 'inline-block' }} /> Missed</span>
+            </div>
+          </div>
 
           {earnings.length === 0
             ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>💸</div><div>No earnings yet — accept a job and upload daily photos!</div></div>

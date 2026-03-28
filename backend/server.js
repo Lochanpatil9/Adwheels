@@ -6,13 +6,14 @@ import leadsRouter from './routes/leads.js'
 import paymentsRouter from './routes/payments.js'
 import campaignsRouter from './routes/campaigns.js'
 import notificationsRouter from './routes/notifications.js'
+import driversRouter from './routes/drivers.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH'],
 }))
 app.use(express.json())
 
@@ -21,6 +22,7 @@ app.use('/api/leads', leadsRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/notifications', notificationsRouter)
+app.use('/api/drivers', driversRouter)
 
 // Auto-expire campaigns: check on startup + every 24 hours
 async function runExpiryCheck() {

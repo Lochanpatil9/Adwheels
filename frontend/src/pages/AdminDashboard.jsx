@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus, ChevronDown, Clock, RefreshCw, Search, Eye, Zap } from 'lucide-react'
-import { sendNotification } from '../lib/api'
+import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus, ChevronDown, Clock, RefreshCw, Search, Eye, Zap, Activity, BarChart3, TrendingUp } from 'lucide-react'
+import { sendNotification, autoAssignNewDriver, autoAssignAll } from '../lib/api'
 import NotificationBell from '../components/NotificationBell'
 
 const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
@@ -406,8 +406,25 @@ export default function AdminDashboard({ profile }) {
     setActionLoading(prev => ({ ...prev, [`verify_${driverId}`]: true }))
     const { error } = await supabase.from('users').update({ is_verified: true }).eq('id', driverId)
     if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`verify_${driverId}`]: false })); return }
-    toast.success('Driver verified ✅'); fetchDrivers()
+    toast.success('Driver verified ✅')
+    // Auto-assign to under-staffed campaigns
+    try {
+      const result = await autoAssignNewDriver(driverId)
+      if (result.assigned) toast.success('🛺 Auto-assigned to a campaign!')
+    } catch (e) { console.error('Auto-assign after verify failed:', e) }
+    fetchDrivers(); fetchCampaigns()
     setActionLoading(prev => ({ ...prev, [`verify_${driverId}`]: false }))
+  }
+
+  async function handleAutoAssignAll() {
+    if (!window.confirm('Auto-assign all free verified drivers to under-staffed campaigns?')) return
+    setActionLoading(prev => ({ ...prev, autoAssignAll: true }))
+    try {
+      const result = await autoAssignAll()
+      toast.success(result.message || `Assigned ${result.assignments} driver(s)`)
+      fetchDrivers(); fetchCampaigns()
+    } catch (e) { toast.error('Auto-assign failed: ' + e.message) }
+    setActionLoading(prev => ({ ...prev, autoAssignAll: false }))
   }
 
   const totalRevenue = campaigns.filter(c => !['pending', 'cancelled'].includes(c.status)).reduce((s, c) => s + (c.plans?.price || 0), 0)
@@ -496,30 +513,116 @@ export default function AdminDashboard({ profile }) {
 
       <div style={{ padding: '16px', maxWidth: '900px', margin: '0 auto' }}>
 
-        {/* HOME */}
+        {/* HOME — Command Center */}
         {tab === 'home' && <div className="tab-content">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '12px', marginBottom: '14px' }}>
-            {[{ n: `₹${totalRevenue.toLocaleString()}`, l: 'Revenue', c: '#D49800' }, { n: activeCampaigns, l: 'Active Ads', c: '#1DB954' }, { n: drivers.length, l: 'Drivers', c: '#1565C0' }, { n: pendingProofs, l: 'Photos to Review', c: '#E53935' }, { n: pendingPayouts, l: 'Payout Requests', c: '#FF8C00' }].map(x => (
-              <div key={x.l} style={card}>
-                <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.8rem', color: x.c, lineHeight: 1 }}>{x.n}</div>
+          {/* KPI Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '12px', marginBottom: '16px' }}>
+            {[
+              { n: `₹${totalRevenue.toLocaleString()}`, l: 'Total Revenue', c: '#D49800', icon: '💰', sub: `${campaigns.filter(c=>c.status==='active').length} active` },
+              { n: activeCampaigns, l: 'Active Campaigns', c: '#1DB954', icon: '📢', sub: `${campaigns.length} total` },
+              { n: drivers.length, l: 'Total Drivers', c: '#1565C0', icon: '🛺', sub: `${drivers.filter(d=>!busyDriverIds.has(d.id)).length} free` },
+              { n: pendingProofs, l: 'Photos to Review', c: '#E53935', icon: '📸', sub: pendingProofs > 0 ? 'Needs attention' : 'All clear' },
+              { n: pendingPayouts, l: 'Payout Requests', c: '#FF8C00', icon: '💳', sub: pendingPayouts > 0 ? 'Pending' : 'All clear' },
+            ].map(x => (
+              <div key={x.l} style={{ ...card, padding: '18px', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: '12px', right: '14px', fontSize: '1.4rem', opacity: 0.15 }}>{x.icon}</div>
+                <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2rem', color: x.c, lineHeight: 1 }}>{x.n}</div>
                 <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>{x.l}</div>
+                <div style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '6px' }}>{x.sub}</div>
               </div>
             ))}
           </div>
-          {pendingProofs > 0 && <div onClick={() => setTab('proofs')} style={{ background: '#FDECEA', border: '1px solid #FFAAAA', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#C62828', fontWeight: 700, cursor: 'pointer', marginBottom: '10px', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>🔴 {pendingProofs} photo{pendingProofs > 1 ? 's' : ''} waiting for your review</div>}
-          {pendingPayouts > 0 && <div onClick={() => setTab('payouts')} style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', marginBottom: '10px', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>💸 {pendingPayouts} payout request{pendingPayouts > 1 ? 's' : ''} pending</div>}
-          <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '12px' }}>Recent Campaigns</div>
-          {campaigns.slice(0, 5).map(c => (
-            <div key={c.id} style={card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: '3px' }}>{c.users?.full_name} — {c.plans?.name}</div>
-                  <div style={{ fontSize: '0.82rem', color: '#888' }}>📍 {c.city} · {c.area} · ₹{c.plans?.price?.toLocaleString()}/mo</div>
+
+          {/* Campaign Status Distribution */}
+          <div style={{ ...card, padding: '20px' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.92rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}><BarChart3 size={15} color="#D49800" /> Campaign Status Distribution</div>
+            <div style={{ display: 'flex', height: '12px', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', background: '#F0F0F0' }}>
+              {[
+                { key: 'active', color: '#1DB954' }, { key: 'paid', color: '#1565C0' },
+                { key: 'pending', color: '#FFBF00' }, { key: 'completed', color: '#888' },
+                { key: 'cancelled', color: '#E53935' },
+              ].map(s => {
+                const count = campaigns.filter(c => c.status === s.key).length
+                const pct = campaigns.length ? (count / campaigns.length * 100) : 0
+                return pct > 0 ? <div key={s.key} style={{ width: `${pct}%`, background: s.color, transition: 'width .4s' }} title={`${s.key}: ${count}`} /> : null
+              })}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {[['active','#1DB954'],['paid','#1565C0'],['pending','#FFBF00'],['completed','#888'],['cancelled','#E53935']].map(([k,c]) => {
+                const count = campaigns.filter(ca => ca.status === k).length
+                return <div key={k} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: c, display: 'inline-block' }} />
+                  <span style={{ fontWeight: 600, color: '#555', textTransform: 'capitalize' }}>{k}</span>
+                  <span style={{ fontWeight: 800, color: c }}>{count}</span>
                 </div>
-                <span style={badge(c.status)}>{c.status}</span>
+              })}
+            </div>
+          </div>
+
+          {/* Driver Utilization */}
+          <div style={{ ...card, padding: '20px' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.92rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={15} color="#1565C0" /> Driver Utilization</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              {/* Donut chart via SVG */}
+              {(() => {
+                const busy = busyDriverIds.size, free = drivers.length - busy, total = drivers.length || 1
+                const busyPct = busy / total * 100, r = 40, c = 2 * Math.PI * r
+                return <svg width="100" height="100" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r={r} fill="none" stroke="#E8E8E8" strokeWidth="10" />
+                  <circle cx="50" cy="50" r={r} fill="none" stroke="#1DB954" strokeWidth="10" strokeDasharray={`${busyPct / 100 * c} ${c}`} strokeLinecap="round" transform="rotate(-90 50 50)" style={{ transition: 'stroke-dasharray .5s' }} />
+                  <text x="50" y="48" textAnchor="middle" fontSize="18" fontWeight="800" fontFamily="Bebas Neue" fill="#111">{busy}/{total}</text>
+                  <text x="50" y="62" textAnchor="middle" fontSize="8" fontWeight="700" fill="#888">ENGAGED</text>
+                </svg>
+              })()}
+              <div style={{ display: 'grid', gap: '8px', flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#E6F9EE', borderRadius: '8px', padding: '10px 14px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0A6B30' }}>🟢 Free Drivers</span>
+                  <span style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.3rem', color: '#1DB954' }}>{drivers.length - busyDriverIds.size}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFF8E6', borderRadius: '8px', padding: '10px 14px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#7A5900' }}>🔴 Engaged</span>
+                  <span style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.3rem', color: '#D49800' }}>{busyDriverIds.size}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FDECEA', borderRadius: '8px', padding: '10px 14px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#C62828' }}>⚪ Unverified</span>
+                  <span style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.3rem', color: '#E53935' }}>{drivers.filter(d => !d.is_verified).length}</span>
+                </div>
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* Alert Banners */}
+          {pendingProofs > 0 && <div onClick={() => setTab('proofs')} style={{ background: '#FDECEA', border: '1px solid #FFAAAA', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#C62828', fontWeight: 700, cursor: 'pointer', marginBottom: '10px', transition: 'transform .15s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><span>🔴 {pendingProofs} photo{pendingProofs > 1 ? 's' : ''} waiting for review</span><span style={{ fontSize: '1.1rem' }}>→</span></div>}
+          {pendingPayouts > 0 && <div onClick={() => setTab('payouts')} style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '14px 16px', fontSize: '0.88rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', marginBottom: '10px', transition: 'transform .15s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}><span>💸 {pendingPayouts} payout request{pendingPayouts > 1 ? 's' : ''} pending</span><span style={{ fontSize: '1.1rem' }}>→</span></div>}
+
+          {/* Recent Campaigns — Enhanced */}
+          <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={15} color="#888" /> Recent Campaigns</div>
+          {campaigns.slice(0, 6).map(c => {
+            const daysActive = c.activated_at ? Math.floor((Date.now() - new Date(c.activated_at).getTime()) / 86400000) : 0
+            const daysLeft = c.activated_at && c.status === 'active' ? Math.max(0, 30 - daysActive) : null
+            const progress = c.activated_at && c.status === 'active' ? Math.min(100, Math.round(daysActive / 30 * 100)) : 0
+            return (
+              <div key={c.id} style={{ ...card, padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, marginBottom: '3px' }}>{c.users?.full_name} — {c.plans?.name}</div>
+                    <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '6px' }}>📍 {c.city} · {c.area} · ₹{c.plans?.price?.toLocaleString()}/mo</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={badge(c.status)}>{c.status}</span>
+                      {daysLeft !== null && <span style={{ fontSize: '0.72rem', color: daysLeft <= 5 ? '#E53935' : '#D49800', fontWeight: 700 }}>⏰ {daysLeft}d left</span>}
+                    </div>
+                  </div>
+                  {c.banner_url && <img src={c.banner_url} alt="banner" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #E8E8E8' }} />}
+                </div>
+                {c.status === 'active' && progress > 0 && (
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#aaa', marginBottom: '4px' }}><span>Day {daysActive}/30</span><span>{progress}%</span></div>
+                    <div style={{ height: '4px', borderRadius: '4px', background: '#F0F0F0', overflow: 'hidden' }}><div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg,#FFBF00,#FF8C00)', borderRadius: '4px', transition: 'width .4s' }} /></div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>}
 
         {/* CAMPAIGNS — with filters + expandable cards */}
@@ -619,62 +722,72 @@ export default function AdminDashboard({ profile }) {
           }
         </div>}
 
-        {/* DRIVERS */}
+        {/* DRIVERS — Enhanced */}
         {tab === 'drivers' && <div className="tab-content">
+          {/* Summary bar + Auto-assign */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {[
+                { l: 'Total', n: drivers.length, c: '#1565C0' },
+                { l: 'Free', n: drivers.length - busyDriverIds.size, c: '#1DB954' },
+                { l: 'Engaged', n: busyDriverIds.size, c: '#D49800' },
+                { l: 'Unverified', n: drivers.filter(d => !d.is_verified).length, c: '#E53935' },
+              ].map(x => (
+                <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                  <span style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.1rem', color: x.c }}>{x.n}</span>
+                  <span style={{ fontWeight: 600, color: '#888' }}>{x.l}</span>
+                </div>
+              ))}
+            </div>
+            <button className="action-btn" onClick={handleAutoAssignAll} disabled={actionLoading.autoAssignAll} style={{ ...btn('#1DB954', '#fff'), fontSize: '0.78rem', padding: '7px 14px', opacity: actionLoading.autoAssignAll ? .6 : 1 }}>
+              <Zap size={13} /> {actionLoading.autoAssignAll ? 'Assigning…' : 'Auto-Assign All'}
+            </button>
+          </div>
+
           {/* Search */}
           <div style={{ position: 'relative', marginBottom: '16px' }}>
             <Search size={16} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: '#bbb', pointerEvents: 'none' }} />
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Search by name, phone, city, or vehicle…"
-              value={driverSearch}
-              onChange={e => setDriverSearch(e.target.value)}
-            />
+            <input className="search-input" type="text" placeholder="Search by name, phone, city, or vehicle…" value={driverSearch} onChange={e => setDriverSearch(e.target.value)} />
           </div>
 
-          {/* Result count */}
-          {driverSearch && (
-            <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '10px' }}>
-              {filteredDrivers.length} result{filteredDrivers.length !== 1 ? 's' : ''} found
-            </div>
-          )}
+          {driverSearch && <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '10px' }}>{filteredDrivers.length} result{filteredDrivers.length !== 1 ? 's' : ''} found</div>}
 
           {filteredDrivers.length === 0
             ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>🛺</div><div>{driverSearch ? 'No drivers match your search' : 'No drivers yet'}</div></div>
-            : filteredDrivers.map(d => (
-              <div key={d.id} style={{ ...card, border: busyDriverIds.has(d.id) ? '1.5px solid #FFE08A' : '1px solid #E8E8E8' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <div style={{ fontWeight: 700 }}>{d.full_name}</div>
-                      {d.is_verified && <span style={{ color: '#1DB954', fontSize: '0.82rem' }}>✅ Verified</span>}
-                      <span style={{
-                        background: busyDriverIds.has(d.id) ? '#FFF8E6' : '#E6F9EE',
-                        color: busyDriverIds.has(d.id) ? '#7A5900' : '#0A6B30',
-                        fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
-                        padding: '3px 8px', borderRadius: '100px'
-                      }}>
-                        {busyDriverIds.has(d.id) ? '🔴 Engaged' : '🟢 Free'}
-                      </span>
+            : filteredDrivers.map(d => {
+              const assignedCampaign = busyDriverIds.has(d.id) ? campaigns.find(c => c.status === 'active' || c.status === 'paid') : null
+              return (
+                <div key={d.id} style={{ ...card, border: busyDriverIds.has(d.id) ? '1.5px solid #FFE08A' : !d.is_verified ? '1.5px solid #FFAAAA' : '1px solid #E8E8E8' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 700 }}>{d.full_name}</div>
+                        {d.is_verified && <span style={{ color: '#1DB954', fontSize: '0.82rem' }}>✅ Verified</span>}
+                        <span style={{
+                          background: busyDriverIds.has(d.id) ? '#FFF8E6' : !d.is_verified ? '#FDECEA' : '#E6F9EE',
+                          color: busyDriverIds.has(d.id) ? '#7A5900' : !d.is_verified ? '#C62828' : '#0A6B30',
+                          fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+                          padding: '3px 8px', borderRadius: '100px'
+                        }}>
+                          {busyDriverIds.has(d.id) ? '🔴 Engaged' : !d.is_verified ? '⚪ Unverified' : '🟢 Free'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>📞 {d.phone} · 📍 {d.city}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>🛺 {d.vehicle_number || 'No vehicle number'}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#888' }}>💳 UPI: {d.upi_id || 'Not set'}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px' }}>Joined: {new Date(d.created_at).toLocaleDateString('en-IN')}</div>
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>📞 {d.phone} · 📍 {d.city}</div>
-                    <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>🛺 {d.vehicle_number || 'No vehicle number'}</div>
-                    <div style={{ fontSize: '0.82rem', color: '#888' }}>💳 UPI: {d.upi_id || 'Not set'}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                      {!d.is_verified && (
+                        <button className="action-btn" style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`verify_${d.id}`] ? .6 : 1 }} onClick={() => handleVerifyDriver(d.id)} disabled={actionLoading[`verify_${d.id}`]}>
+                          <CheckCircle size={14} /> {actionLoading[`verify_${d.id}`] ? 'Verifying…' : 'Verify + Auto-Assign'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {!d.is_verified && (
-                    <button
-                      className="action-btn"
-                      style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`verify_${d.id}`] ? .6 : 1 }}
-                      onClick={() => handleVerifyDriver(d.id)}
-                      disabled={actionLoading[`verify_${d.id}`]}
-                    >
-                      <CheckCircle size={14} /> {actionLoading[`verify_${d.id}`] ? 'Verifying…' : 'Verify'}
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           }
         </div>}
 

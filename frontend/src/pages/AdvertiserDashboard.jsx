@@ -426,15 +426,15 @@ export default function AdvertiserDashboard({ profile }) {
           />
         </div>}
 
-        {/* ── STATS ── */}
+        {/* ── STATS — Enhanced Campaign Dashboard ── */}
         {tab === 'stats' && <div className="tab-content">
           {!selectedCampaign
             ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
               <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📊</div>
               <div style={{ fontWeight: 700, color: '#999', marginBottom: '10px' }}>Select a campaign to view stats</div>
-              {campaigns.filter(c => c.status === 'active').map(c => (
+              {campaigns.filter(c => ['active','paid','completed'].includes(c.status)).map(c => (
                 <button key={c.id} className="action-btn" onClick={() => loadStats(c)} style={{ ...btn('#FFBF00', '#111'), marginBottom: '8px', width: '100%', justifyContent: 'space-between' }}>
-                  <span>{c.plans?.name} — {c.city}</span>
+                  <span>{c.plans?.name} — {c.city} <span style={badge(c.status)}>{c.status}</span></span>
                   <ChevronRight size={16} />
                 </button>
               ))}
@@ -449,33 +449,86 @@ export default function AdvertiserDashboard({ profile }) {
               )}
               <StatusTimeline status={selectedCampaign.status} />
 
+              {/* Campaign Progress Bar */}
+              {selectedCampaign.activated_at && (() => {
+                const daysActive = Math.floor((Date.now() - new Date(selectedCampaign.activated_at).getTime()) / 86400000)
+                const daysLeft = Math.max(0, 30 - daysActive)
+                const progress = Math.min(100, Math.round(daysActive / 30 * 100))
+                return (
+                  <div style={{ ...card, marginTop: '14px', padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>📅 Campaign Progress</span>
+                      <span style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.2rem', color: daysLeft <= 5 ? '#E53935' : '#D49800' }}>{daysLeft} days left</span>
+                    </div>
+                    <div style={{ height: '8px', borderRadius: '6px', background: '#F0F0F0', overflow: 'hidden', marginBottom: '8px' }}>
+                      <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg,#FFBF00,#FF8C00)', borderRadius: '6px', transition: 'width .5s' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa' }}>
+                      <span>Day {daysActive} of 30</span>
+                      <span>{progress}% complete</span>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {!stats
                 ? <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Loading stats…</div>
                 : <>
+                  {/* Enhanced stat cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(100px,1fr))', gap: '10px', marginTop: '16px', marginBottom: '14px' }}>
                     {[
-                      { n: stats.drivers || 0, l: 'Drivers', c: '#1565C0' },
-                      { n: stats.totalProofs || 0, l: 'Total Proofs', c: '#D49800' },
-                      { n: stats.approvedProofs || 0, l: 'Approved', c: '#1DB954' },
-                      { n: stats.totalProofs && stats.approvedProofs ? Math.round((stats.approvedProofs / stats.totalProofs) * 100) : 0, l: '% Rate', c: '#666' },
+                      { n: stats.drivers || 0, l: 'Drivers', c: '#1565C0', icon: '🛺' },
+                      { n: stats.totalProofs || 0, l: 'Total Proofs', c: '#D49800', icon: '📸' },
+                      { n: stats.approvedProofs || 0, l: 'Approved', c: '#1DB954', icon: '✅' },
+                      { n: `${stats.totalProofs && stats.approvedProofs ? Math.round((stats.approvedProofs / stats.totalProofs) * 100) : 0}%`, l: 'Rate', c: '#666', icon: '📊' },
+                      { n: ((selectedCampaign.plans?.rickshaw_count || 1) * 200).toLocaleString(), l: 'Est. Daily Views', c: '#a855f7', icon: '👀' },
+                      { n: `₹${Math.round((selectedCampaign.plans?.price || 0) / 30)}`, l: 'Cost/Day', c: '#FF8C00', icon: '💸' },
                     ].map(x => (
-                      <div key={x.l} style={card}>
-                        <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: x.c, lineHeight: 1 }}>{x.n}</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>{x.l}</div>
+                      <div key={x.l} style={{ ...card, padding: '14px', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: '8px', right: '10px', fontSize: '1.1rem', opacity: 0.12 }}>{x.icon}</div>
+                        <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.5rem', color: x.c, lineHeight: 1 }}>{x.n}</div>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>{x.l}</div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Recent proof photos */}
+                  {/* Proof Approval Progress Ring */}
+                  {stats.totalProofs > 0 && (
+                    <div style={{ ...card, padding: '20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      {(() => {
+                        const pct = Math.round((stats.approvedProofs / stats.totalProofs) * 100)
+                        const r = 36, c = 2 * Math.PI * r
+                        return <svg width="90" height="90" viewBox="0 0 90 90" style={{ flexShrink: 0 }}>
+                          <circle cx="45" cy="45" r={r} fill="none" stroke="#F0F0F0" strokeWidth="8" />
+                          <circle cx="45" cy="45" r={r} fill="none" stroke="#1DB954" strokeWidth="8" strokeDasharray={`${pct / 100 * c} ${c}`} strokeLinecap="round" transform="rotate(-90 45 45)" style={{ transition: 'stroke-dasharray .5s' }} />
+                          <text x="45" y="43" textAnchor="middle" fontSize="16" fontWeight="800" fontFamily="Bebas Neue" fill="#1DB954">{pct}%</text>
+                          <text x="45" y="56" textAnchor="middle" fontSize="7" fontWeight="700" fill="#888">APPROVED</text>
+                        </svg>
+                      })()}
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '6px' }}>Proof Approval Status</div>
+                        <div style={{ fontSize: '0.82rem', color: '#888', lineHeight: 1.6 }}>
+                          ✅ {stats.approvedProofs} approved<br />
+                          ⏳ {(stats.totalProofs || 0) - (stats.approvedProofs || 0)} pending/rejected<br />
+                          📸 {stats.totalProofs} total submissions
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Proof Photo Gallery */}
                   {stats.proofs && stats.proofs.length > 0 && (
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px' }}>📸 Recent Proof Photos</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: '8px' }}>
-                        {stats.proofs.slice(0, 12).map((p, i) => (
-                          <div key={i} style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', border: '1px solid #E8E8E8', aspectRatio: '4/3' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px' }}>📸 Proof Photos</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '10px' }}>
+                        {stats.proofs.slice(0, 15).map((p, i) => (
+                          <div key={i} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E8E8', aspectRatio: '4/3' }}>
                             <img src={p.photo_url} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent,rgba(0,0,0,.65))', padding: '6px 8px' }}>
-                              <div style={badge(p.status)}>{p.status}</div>
+                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent,rgba(0,0,0,.7))', padding: '6px 8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={badge(p.status)}>{p.status}</span>
+                                <span style={{ fontSize: '0.6rem', color: '#ddd', fontWeight: 600 }}>{p.proof_date || ''}</span>
+                              </div>
                             </div>
                           </div>
                         ))}
