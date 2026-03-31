@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, Upload, ChevronRight, RefreshCw, CheckCircle } from 'lucide-react'
+import { LogOut, Upload, ChevronRight, RefreshCw, CheckCircle, Home, Megaphone, PlusCircle, BarChart3, UserCircle, MapPin, Truck, Zap, Bike } from 'lucide-react'
 import { createRazorpayOrder, verifyPayment, cancelCampaign, getCampaignStats, sendNotification } from '../lib/api'
 import NotificationBell from '../components/NotificationBell'
+import AccountSection from '../components/AccountSection'
 
 const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
 const btn = (bg = '#FFBF00', col = '#111') => ({ background: bg, color: col, border: 'none', borderRadius: '12px', padding: '14px 20px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all .18s' })
@@ -286,11 +287,15 @@ export default function AdvertiserDashboard({ profile }) {
   const totalSpend = campaigns.filter(c => !['pending', 'cancelled'].includes(c.status)).reduce((s, c) => s + (c.plans?.price || 0), 0)
   const totalRickshaws = campaigns.filter(c => c.status === 'active').reduce((s, c) => s + (c.plans?.rickshaw_count || 0), 0)
 
+  const VEHICLE_TYPE_LABELS = { auto_rickshaw: 'Auto Rickshaw', e_rickshaw: 'E-Rickshaw', cycle_rickshaw: 'Cycle Rickshaw' }
+  const VEHICLE_ICONS_MAP = { auto_rickshaw: Truck, e_rickshaw: Zap, cycle_rickshaw: Bike }
+
   const TABS = [
-    { key: 'home', icon: '🏠', label: 'Home' },
-    { key: 'campaigns', icon: '📢', label: `Campaigns (${campaigns.length})` },
-    { key: 'create', icon: '➕', label: 'New Ad' },
-    { key: 'stats', icon: '📊', label: 'Stats' },
+    { key: 'home', Icon: Home, label: 'Home' },
+    { key: 'campaigns', Icon: Megaphone, label: `Campaigns (${campaigns.length})` },
+    { key: 'create', Icon: PlusCircle, label: 'New Ad' },
+    { key: 'stats', Icon: BarChart3, label: 'Stats' },
+    { key: 'account', Icon: UserCircle, label: 'Account' },
   ]
 
   return (
@@ -307,7 +312,7 @@ export default function AdvertiserDashboard({ profile }) {
             <RefreshCw size={14} className={refreshing ? 'refresh-spin' : ''} />
           </button>
           <NotificationBell userId={profile.id} />
-          <span style={{ fontSize: '0.84rem', color: '#666' }}>💼 {profile.full_name}</span>
+          <span style={{ fontSize: '0.84rem', color: '#666' }}>{profile.full_name}</span>
           <button onClick={signOut} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 12px', fontSize: '0.82rem', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <LogOut size={13} /> Logout
           </button>
@@ -317,8 +322,8 @@ export default function AdvertiserDashboard({ profile }) {
       {/* TOP TABS */}
       <div className="hide-on-mobile-nav" style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', padding: '0 6px' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 14px', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#D49800' : '#999', borderBottom: tab === t.key ? '2.5px solid #FFBF00' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s' }}>
-            {t.icon} {t.label}
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 14px', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#D49800' : '#999', borderBottom: tab === t.key ? '2.5px solid #FFBF00' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <t.Icon size={15} /> {t.label}
           </button>
         ))}
       </div>
@@ -327,7 +332,9 @@ export default function AdvertiserDashboard({ profile }) {
       <div className="bottom-nav">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} className={`bottom-nav-item${tab === t.key ? ' bottom-nav-item--active' : ''}`}>
-            <span className="nav-icon">{t.icon}</span>
+            <span className="nav-icon" style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <t.Icon size={18} style={{color: tab === t.key ? '#D49800' : '#999'}}/>
+            </span>
             <span className="nav-label" style={{ color: tab === t.key ? '#D49800' : '#999' }}>{t.label}</span>
           </button>
         ))}
@@ -539,6 +546,11 @@ export default function AdvertiserDashboard({ profile }) {
               }
             </div>
           }
+        </div>}
+
+        {/* ── ACCOUNT ── */}
+        {tab === 'account' && <div className="tab-content">
+          <AccountSection profile={profile} role="advertiser" />
         </div>}
 
       </div>

@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, Upload, CheckCircle, XCircle, Wallet, Camera, RefreshCw } from 'lucide-react'
+import { LogOut, Upload, CheckCircle, XCircle, Wallet, Camera, RefreshCw, Home, Briefcase, IndianRupee, CreditCard, UserCircle, Truck, Zap, Bike, MapPin, Flame, Info, Calendar as CalendarIcon, Gift, Printer } from 'lucide-react'
 import { sendNotification } from '../lib/api'
 import NotificationBell from '../components/NotificationBell'
+import AccountSection from '../components/AccountSection'
 
 /* ── Shared light-theme style helpers ── */
 const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
@@ -14,6 +15,18 @@ const badge = (s) => {
   const m = { offered: ['#FFF8E6', '#7A5900'], active: ['#E6F9EE', '#0A6B30'], completed: ['#F5F5F5', '#666'], rejected: ['#FDECEA', '#C62828'], pending: ['#FFF8E6', '#7A5900'], approved: ['#E6F9EE', '#0A6B30'] }
   const [bg, c] = m[s] || ['#F5F5F5', '#666']
   return { display: 'inline-block', background: bg, color: c, fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: '100px' }
+}
+
+const VEHICLE_TYPE_LABELS = {
+  auto_rickshaw: 'Auto Rickshaw',
+  e_rickshaw: 'E-Rickshaw',
+  cycle_rickshaw: 'Cycle Rickshaw'
+}
+
+const VEHICLE_ICONS = {
+  auto_rickshaw: Truck,
+  e_rickshaw: Zap,
+  cycle_rickshaw: Bike
 }
 
 export default function DriverDashboard({ profile }) {
@@ -81,7 +94,7 @@ export default function DriverDashboard({ profile }) {
       .update({ status: 'active', accepted_at: new Date().toISOString() })
       .eq('id', jobId).eq('driver_id', profile.id)
     if (error) return toast.error(error.message)
-    toast.success('Job accepted! 🎉 Print the banner and install it.')
+    toast.success('Job accepted! Print the banner and install it.')
     await fetchAll(); setTab('proof')
   }
 
@@ -112,7 +125,7 @@ export default function DriverDashboard({ profile }) {
       photo_url: publicUrl, proof_date: today, status: 'pending'
     }, { onConflict: 'driver_job_id,proof_date' })
     if (error) { toast.error(error.message); setUploading(false); return }
-    toast.success('Photo submitted! ✅ Admin will review it.')
+    toast.success('Photo submitted! Admin will review it.')
 
     try {
       const { data: campaign } = await supabase
@@ -124,7 +137,7 @@ export default function DriverDashboard({ profile }) {
         await sendNotification({
           userId: campaign.advertiser_id,
           type: 'proof_uploaded',
-          title: '📸 New Proof Photo',
+          title: 'New Proof Photo',
           message: `Your driver submitted today\'s proof photo for "${campaign.company_name}". Check the Stats tab for details.`
         })
       }
@@ -141,11 +154,11 @@ export default function DriverDashboard({ profile }) {
     const amount = parseInt(payoutAmount)
     if (!amount || amount < 500) return toast.error('Minimum payout is ₹500')
     if (amount > totalEarnings - totalPaidOut) return toast.error('Amount exceeds your balance')
-    if (!profile.upi_id) return toast.error('Please add your UPI ID — contact admin')
+    if (!profile.upi_id) return toast.error('Please add your UPI ID in the Account tab')
     setPayoutLoading(true)
     const { error } = await supabase.from('payouts').insert({ driver_id: profile.id, amount, upi_id: profile.upi_id, status: 'requested' })
     if (error) toast.error(error.message)
-    else { toast.success('Payout requested! 💸 Will be processed in 1–2 days.'); setPayoutAmount(''); fetchPayouts() }
+    else { toast.success('Payout requested! Will be processed in 1-2 days.'); setPayoutAmount(''); fetchPayouts() }
     setPayoutLoading(false)
   }
 
@@ -168,12 +181,15 @@ export default function DriverDashboard({ profile }) {
     return count
   })()
 
+  const VehicleIcon = profile.vehicle_type ? (VEHICLE_ICONS[profile.vehicle_type] || Truck) : Truck
+
   const TABS = [
-    { key: 'home', icon: '🏠', label: 'Home' },
-    { key: 'jobs', icon: '💼', label: offeredJobs.length ? `Jobs (${offeredJobs.length})` : 'Jobs' },
-    { key: 'proof', icon: '📸', label: activeJob && !todayProof ? 'Proof ⚠️' : 'Proof' },
-    { key: 'earning', icon: '💰', label: 'Earnings' },
-    { key: 'payout', icon: '💳', label: 'Payout' },
+    { key: 'home', Icon: Home, label: 'Home' },
+    { key: 'jobs', Icon: Briefcase, label: offeredJobs.length ? `Jobs (${offeredJobs.length})` : 'Jobs' },
+    { key: 'proof', Icon: Camera, label: activeJob && !todayProof ? 'Proof' : 'Proof', alert: activeJob && !todayProof },
+    { key: 'earning', Icon: IndianRupee, label: 'Earnings' },
+    { key: 'payout', Icon: CreditCard, label: 'Payout' },
+    { key: 'account', Icon: UserCircle, label: 'Account' },
   ]
 
   return (
@@ -187,7 +203,7 @@ export default function DriverDashboard({ profile }) {
             <RefreshCw size={14} className={refreshing ? 'refresh-spin' : ''} />
           </button>
           <NotificationBell userId={profile.id} />
-          <span style={{ fontSize: '0.84rem', color: '#666' }}>👋 {profile.full_name}</span>
+          <span style={{ fontSize: '0.84rem', color: '#666' }}>{profile.full_name}</span>
           <button onClick={signOut} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 12px', fontSize: '0.82rem', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <LogOut size={13} /> Logout
           </button>
@@ -199,13 +215,16 @@ export default function DriverDashboard({ profile }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: '0.83rem', opacity: 0.65, marginBottom: '2px' }}>Welcome back,</div>
-            <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '1.25rem' }}>{profile.full_name} 👋</div>
-            <div style={{ fontSize: '0.82rem', marginTop: '3px', opacity: 0.7 }}>🛺 Driver · {profile.city}</div>
+            <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '1.25rem' }}>{profile.full_name}</div>
+            <div style={{ fontSize: '0.82rem', marginTop: '3px', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <VehicleIcon size={14} />
+              {profile.vehicle_type ? VEHICLE_TYPE_LABELS[profile.vehicle_type] : 'Driver'} · {profile.city}
+            </div>
           </div>
           {streak > 0 && (
             <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '12px', padding: '8px 14px', textAlign: 'center' }}>
               <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.5rem', lineHeight: 1, color: '#111' }}>{streak}</div>
-              <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7 }}>Day Streak 🔥</div>
+              <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '3px', justifyContent: 'center' }}><Flame size={10}/> Streak</div>
             </div>
           )}
         </div>
@@ -214,8 +233,8 @@ export default function DriverDashboard({ profile }) {
       {/* TOP TABS — hidden on mobile when bottom nav is visible */}
       <div className="hide-on-mobile-nav" style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', padding: '0 6px' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 14px', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#D49800' : '#999', borderBottom: tab === t.key ? '2.5px solid #FFBF00' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s' }}>
-            {t.icon} {t.label}
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 14px', border: 'none', background: 'none', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#D49800' : '#999', borderBottom: tab === t.key ? '2.5px solid #FFBF00' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <t.Icon size={15} /> {t.label} {t.alert && <span style={{width:'6px',height:'6px',borderRadius:'50%',background:'#E53935',display:'inline-block'}}/>}
           </button>
         ))}
       </div>
@@ -228,7 +247,10 @@ export default function DriverDashboard({ profile }) {
             onClick={() => setTab(t.key)}
             className={`bottom-nav-item${tab === t.key ? ' bottom-nav-item--active' : ''}`}
           >
-            <span className="nav-icon">{t.icon}</span>
+            <span className="nav-icon" style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+              <t.Icon size={18} style={{color: tab === t.key ? '#D49800' : '#999'}}/>
+              {t.alert && <span style={{position:'absolute',top:'-2px',right:'-4px',width:'6px',height:'6px',borderRadius:'50%',background:'#E53935'}}/>}
+            </span>
             <span className="nav-label" style={{ color: tab === t.key ? '#D49800' : '#999' }}>{t.label}</span>
           </button>
         ))}
@@ -252,7 +274,7 @@ export default function DriverDashboard({ profile }) {
           {offeredJobs.length > 0 && (
             <div onClick={() => setTab('jobs')} style={{ background: '#FFF8E6', border: '1.5px solid #FFE08A', borderRadius: '14px', padding: '16px 18px', marginBottom: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
               <div>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#7A5900' }}>🔔 New Job Available!</div>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#7A5900', display: 'flex', alignItems: 'center', gap: '6px' }}><Briefcase size={16}/> New Job Available!</div>
                 <div style={{ fontSize: '0.83rem', color: '#999', marginTop: '2px' }}>Tap to see details and earn money</div>
               </div>
               <span style={{ fontSize: '1.4rem', color: '#D49800' }}>→</span>
@@ -265,8 +287,8 @@ export default function DriverDashboard({ profile }) {
                 <span style={{ width: '9px', height: '9px', background: '#1DB954', borderRadius: '50%', display: 'inline-block' }} />
                 <span style={{ fontWeight: 800, color: '#0A6B30', fontSize: '0.93rem' }}>Active Job Running</span>
               </div>
-              <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '4px' }}>📍 {activeJob.campaigns?.city} — {activeJob.campaigns?.area}</div>
-              <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '14px' }}>💰 ₹{activeJob.campaigns?.plans?.driver_payout}/month + ₹175 for printing</div>
+              <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={14}/> {activeJob.campaigns?.city} — {activeJob.campaigns?.area}</div>
+              <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}><IndianRupee size={14}/> ₹{activeJob.campaigns?.plans?.driver_payout}/month + ₹175 for printing</div>
 
               {/* Banner preview */}
               {activeJob.campaigns?.banner_url && (
@@ -277,22 +299,23 @@ export default function DriverDashboard({ profile }) {
               )}
 
               {todayProof
-                ? <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '10px 14px', fontSize: '0.87rem', color: '#0A6B30', fontWeight: 700 }}>✅ Today's photo submitted — {todayProof.status}</div>
-                : <div onClick={() => setTab('proof')} style={{ background: '#FFF8E6', borderRadius: '10px', padding: '12px 14px', fontSize: '0.87rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', textAlign: 'center', transition: 'transform .15s' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                  📸 Upload today's photo to earn today →
+                ? <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '10px 14px', fontSize: '0.87rem', color: '#0A6B30', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={15}/> Today's photo submitted — {todayProof.status}</div>
+                : <div onClick={() => setTab('proof')} style={{ background: '#FFF8E6', borderRadius: '10px', padding: '12px 14px', fontSize: '0.87rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', textAlign: 'center', transition: 'transform .15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                  <Camera size={15}/> Upload today's photo to earn today →
                 </div>
               }
             </div>
           ) : !offeredJobs.length && (
             <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🛺</div>
+              <VehicleIcon size={48} style={{ color: '#ddd', marginBottom: '10px' }} />
               <div style={{ fontWeight: 700, color: '#999', fontSize: '1rem', marginBottom: '4px' }}>No jobs yet</div>
               <div style={{ fontSize: '0.84rem' }}>We'll notify you when a job is available!</div>
             </div>
           )}
 
-          <div style={{ background: '#EFF6FF', border: '1px solid #BBDEFB', borderRadius: '12px', padding: '13px 16px', fontSize: '0.84rem', color: '#1565C0', marginTop: '10px' }}>
-            💡 <b>Remember:</b> Upload your rickshaw photo every day to get paid. No photo = no earning for that day.
+          <div style={{ background: '#EFF6FF', border: '1px solid #BBDEFB', borderRadius: '12px', padding: '13px 16px', fontSize: '0.84rem', color: '#1565C0', marginTop: '10px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <Info size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+            <span><b>Remember:</b> Upload your rickshaw photo every day to get paid. No photo = no earning for that day.</span>
           </div>
         </div>}
 
@@ -303,10 +326,10 @@ export default function DriverDashboard({ profile }) {
             {offeredJobs.map(job => (
               <div key={job.id} style={{ ...card, border: '1.5px solid #FFE08A' }}>
                 {job.campaigns?.plans?.is_urgent && (
-                  <div style={{ background: '#FDECEA', color: '#C62828', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: '6px', display: 'inline-block', marginBottom: '10px' }}>⚡ Urgent</div>
+                  <div style={{ background: '#FDECEA', color: '#C62828', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}><Zap size={12}/> Urgent</div>
                 )}
                 <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '4px', color: '#111' }}>{job.campaigns?.plans?.name} Plan</div>
-                <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '14px' }}>📍 {job.campaigns?.city} — {job.campaigns?.area}</div>
+                <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={14}/> {job.campaigns?.city} — {job.campaigns?.area}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                   <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
                     <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.6rem', color: '#0A6B30' }}>₹{job.campaigns?.plans?.driver_payout}</div>
@@ -343,7 +366,7 @@ export default function DriverDashboard({ profile }) {
 
           {jobs.length === 0 && (
             <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📭</div>
+              <Briefcase size={48} style={{ color: '#ddd', marginBottom: '10px' }} />
               <div>No jobs yet — we'll assign one soon!</div>
             </div>
           )}
@@ -353,7 +376,7 @@ export default function DriverDashboard({ profile }) {
         {tab === 'proof' && <div className="tab-content">
           {!activeJob
             ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📷</div>
+              <Camera size={48} style={{ color: '#ddd', marginBottom: '10px' }} />
               <div style={{ fontWeight: 700, fontSize: '1rem', color: '#999', marginBottom: '6px' }}>No active job</div>
               <div style={{ fontSize: '0.84rem', marginBottom: '16px' }}>Accept a job first, then upload your photo here</div>
               {offeredJobs.length > 0 && (
@@ -361,14 +384,14 @@ export default function DriverDashboard({ profile }) {
               )}
             </div>
             : <div style={card}>
-              <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '6px' }}>📸 Today's Photo</div>
+              <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}><Camera size={16}/> Today's Photo</div>
               <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '16px', lineHeight: 1.6 }}>
                 Take a clear photo of the ad banner on your rickshaw.<br />
                 <b style={{ color: '#111' }}>No photo = no earning today.</b>
               </div>
               {todayProof
                 ? <div style={{ background: '#E6F9EE', border: '1px solid #A3E4BE', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ color: '#0A6B30', fontWeight: 800, marginBottom: '10px' }}>✅ Photo submitted — {todayProof.status}</div>
+                  <div style={{ color: '#0A6B30', fontWeight: 800, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={15}/> Photo submitted — {todayProof.status}</div>
                   <img src={todayProof.photo_url} alt="proof" style={{ maxWidth: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: '8px' }} />
                 </div>
                 : <>
@@ -387,7 +410,7 @@ export default function DriverDashboard({ profile }) {
                   <input id="proofInput" type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleProofSelect} />
                   {proofPreview && (
                     <button className="action-btn" onClick={handleUploadProof} disabled={uploading} style={{ ...btn('#1DB954', '#fff'), width: '100%', justifyContent: 'center', marginTop: '14px', opacity: uploading ? .6 : 1 }}>
-                      {uploading ? 'Uploading…' : <><Upload size={16} /> Submit Photo</>}
+                      {uploading ? 'Uploading...' : <><Upload size={16} /> Submit Photo</>}
                     </button>
                   )}
                 </>
@@ -413,14 +436,14 @@ export default function DriverDashboard({ profile }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
                 <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2.2rem', color: '#D49800', lineHeight: 1 }}>{streak}</div>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#7A5900' }}>Day Streak 🔥</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#7A5900', display: 'flex', alignItems: 'center', gap: '4px' }}><Flame size={16}/> Day Streak</div>
                   <div style={{ fontSize: '0.78rem', color: '#999' }}>Keep uploading daily!</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {[{ d: 7, e: '🥉', l: '7 Days' }, { d: 14, e: '🥈', l: '14 Days' }, { d: 30, e: '🥇', l: '30 Days' }].map(m => (
+                {[{ d: 7, l: '7 Days' }, { d: 14, l: '14 Days' }, { d: 30, l: '30 Days' }].map(m => (
                   <div key={m.d} style={{ background: streak >= m.d ? '#1DB954' : '#E8E8E8', color: streak >= m.d ? '#fff' : '#bbb', borderRadius: '100px', padding: '5px 12px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {m.e} {m.l} {streak >= m.d ? '✓' : ''}
+                    {m.l} {streak >= m.d ? <CheckCircle size={11}/> : ''}
                   </div>
                 ))}
               </div>
@@ -429,7 +452,7 @@ export default function DriverDashboard({ profile }) {
 
           {/* Earning Calendar — last 30 days */}
           <div style={{ ...card, padding: '16px', marginBottom: '14px' }}>
-            <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '10px' }}>📅 Last 30 Days</div>
+            <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}><CalendarIcon size={15}/> Last 30 Days</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px' }}>
               {Array.from({ length: 30 }, (_, i) => {
                 const d = new Date(); d.setDate(d.getDate() - (29 - i))
@@ -456,12 +479,14 @@ export default function DriverDashboard({ profile }) {
           </div>
 
           {earnings.length === 0
-            ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>💸</div><div>No earnings yet — accept a job and upload daily photos!</div></div>
+            ? <div style={{ textAlign: 'center', padding: '48px 16px', color: '#bbb' }}><IndianRupee size={48} style={{ color: '#ddd', marginBottom: '10px' }} /><div>No earnings yet — accept a job and upload daily photos!</div></div>
             : <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', border: '1px solid #E8E8E8' }}>
               {earnings.slice(0, 40).map((e, i) => (
                 <div key={e.id} style={{ padding: '14px 16px', borderBottom: i < earnings.length - 1 ? '1px solid #F0F0F0' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>{e.type === 'daily' ? '📅 Daily earning' : e.type === 'print_reimbursement' ? '🖨️ Print money' : '🎁 Bonus'}</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {e.type === 'daily' ? <><CalendarIcon size={14}/> Daily earning</> : e.type === 'print_reimbursement' ? <><Printer size={14}/> Print money</> : <><Gift size={14}/> Bonus</>}
+                    </div>
                     <div style={{ fontSize: '0.78rem', color: '#aaa', marginTop: '2px' }}>{e.earning_date}</div>
                   </div>
                   <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.3rem', color: '#1DB954' }}>+₹{e.amount}</div>
@@ -476,20 +501,26 @@ export default function DriverDashboard({ profile }) {
           <div style={{ background: 'linear-gradient(135deg,#1DB954,#0E9E42)', borderRadius: '16px', padding: '22px', marginBottom: '14px', color: '#fff' }}>
             <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: .8, marginBottom: '6px' }}>Available Balance</div>
             <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2.8rem', lineHeight: 1, marginBottom: '4px' }}>₹{balance}</div>
-            <div style={{ fontSize: '0.82rem', opacity: .75 }}>UPI: {profile.upi_id || 'Not set — contact admin'}</div>
+            <div style={{ fontSize: '0.82rem', opacity: .75, display: 'flex', alignItems: 'center', gap: '4px' }}><CreditCard size={14}/> UPI: {profile.upi_id || 'Not set — add in Account tab'}</div>
           </div>
           <div style={card}>
             <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '4px' }}>Request Payout</div>
-            <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '16px' }}>Minimum ₹500 · Paid to your UPI in 1–2 days</div>
+            <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '16px' }}>Minimum ₹500 · Paid to your UPI in 1-2 days</div>
             <label style={{ display: 'block', fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px', color: '#444' }}>Amount (₹)</label>
             <input type="number" placeholder="Enter amount (min ₹500)" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} style={inp} />
             <button className="action-btn" onClick={handleRequestPayout} disabled={payoutLoading} style={{ ...btn('#1DB954', '#fff'), width: '100%', justifyContent: 'center', opacity: payoutLoading ? .6 : 1 }}>
-              {payoutLoading ? 'Requesting…' : <><Wallet size={16} /> Request Payout</>}
+              {payoutLoading ? 'Requesting...' : <><Wallet size={16} /> Request Payout</>}
             </button>
           </div>
-          <div style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '13px 16px', fontSize: '0.84rem', color: '#7A5900' }}>
-            💡 Earnings are credited only after admin approves your daily photo. Upload every day!
+          <div style={{ background: '#FFF8E6', border: '1px solid #FFE08A', borderRadius: '12px', padding: '13px 16px', fontSize: '0.84rem', color: '#7A5900', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <Info size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+            <span>Earnings are credited only after admin approves your daily photo. Upload every day!</span>
           </div>
+        </div>}
+
+        {/* ── ACCOUNT ── */}
+        {tab === 'account' && <div className="tab-content">
+          <AccountSection profile={profile} role="driver" />
         </div>}
 
       </div>

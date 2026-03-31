@@ -18,12 +18,14 @@ function ProtectedRoute({ children }) {
 }
 
 function DashboardRouter() {
-  const { profile, user } = useAuth()
-  if (!profile) return <LoadingSpinner label="Setting up your account…" />
-  if (profile.role === 'admin') return <AdminDashboard profile={profile} />
-  if (profile.role === 'driver') return <DriverDashboard profile={profile} />
-  if (profile.role === 'advertiser') return <AdvertiserDashboard profile={profile} />
-  // No role yet — show setup (setup mode)
+  const { profile, user, loading } = useAuth()
+  // Still loading profile from DB — show spinner briefly
+  if (loading) return <LoadingSpinner label="Loading your account…" />
+  // Profile exists and has a role — go to the right dashboard
+  if (profile?.role === 'admin') return <AdminDashboard profile={profile} />
+  if (profile?.role === 'driver') return <DriverDashboard profile={profile} />
+  if (profile?.role === 'advertiser') return <AdvertiserDashboard profile={profile} />
+  // No profile or no role — show setup form so user can complete registration
   return <AuthPage setupMode userId={user?.id} />
 }
 

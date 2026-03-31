@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus, ChevronDown, Clock, RefreshCw, Search, Eye, Zap, Activity, BarChart3, TrendingUp } from 'lucide-react'
+import { LogOut, CheckCircle, XCircle, Users, Wallet, Plus, ChevronDown, Clock, RefreshCw, Search, Eye, Zap, Activity, BarChart3, TrendingUp, Home, Camera, CreditCard, UserCircle, Megaphone, Building2, Truck, Bike, MapPin, Fuel } from 'lucide-react'
 import { sendNotification, autoAssignNewDriver, autoAssignAll } from '../lib/api'
 import NotificationBell from '../components/NotificationBell'
+import AccountSection from '../components/AccountSection'
 
 const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
 const btn = (bg = '#FFBF00', col = '#111') => ({ background: bg, color: col, border: 'none', borderRadius: '8px', padding: '9px 16px', fontWeight: 700, fontSize: '0.84rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', transition: 'all .18s' })
@@ -466,14 +467,21 @@ export default function AdminDashboard({ profile }) {
     )
     : drivers
 
+  const VEHICLE_TYPE_LABELS = { auto_rickshaw: 'Auto Rickshaw', e_rickshaw: 'E-Rickshaw', cycle_rickshaw: 'Cycle Rickshaw' }
+  const VEHICLE_ICONS_MAP = { auto_rickshaw: Truck, e_rickshaw: Zap, cycle_rickshaw: Bike }
+  const VEHICLE_COLORS = { auto_rickshaw: '#FFBF00', e_rickshaw: '#10B981', cycle_rickshaw: '#8B5CF6' }
+  const FUEL_LABELS = { petrol: 'Petrol', cng: 'CNG', electric: 'Electric', manual: 'Manual' }
+  const SIZE_LABELS = { small: 'Small', medium: 'Medium', large: 'Large' }
+
   const TABS = [
-    { key: 'home', label: '🏠 Home' },
-    { key: 'campaigns', label: `📢 Ads (${campaigns.length})` },
-    { key: 'drivers', label: `🛺 Drivers (${drivers.length})` },
-    { key: 'proofs', label: pendingProofs ? `📸 Photos 🔴${pendingProofs}` : '📸 Photos' },
-    { key: 'payouts', label: pendingPayouts ? `💳 Payouts 🔴${pendingPayouts}` : '💳 Payouts' },
-    { key: 'users', label: `👥 Users (${users.length})` },
-    { key: 'leads', label: '🏢 Leads' },
+    { key: 'home', Icon: Home, label: 'Home' },
+    { key: 'campaigns', Icon: Megaphone, label: `Ads (${campaigns.length})` },
+    { key: 'drivers', Icon: Truck, label: `Drivers (${drivers.length})` },
+    { key: 'proofs', Icon: Camera, label: 'Photos', alert: pendingProofs > 0, alertCount: pendingProofs },
+    { key: 'payouts', Icon: CreditCard, label: 'Payouts', alert: pendingPayouts > 0, alertCount: pendingPayouts },
+    { key: 'users', Icon: Users, label: `Users (${users.length})` },
+    { key: 'leads', Icon: Building2, label: 'Leads' },
+    { key: 'account', Icon: UserCircle, label: 'Account' },
   ]
 
   return (
@@ -495,7 +503,7 @@ export default function AdminDashboard({ profile }) {
           </button>
           {/* Notification Bell */}
           <NotificationBell userId={profile.id} />
-          <span style={{ fontSize: '0.84rem', color: '#666' }}>👑 {profile.full_name}</span>
+          <span style={{ fontSize: '0.84rem', color: '#666' }}>{profile.full_name}</span>
           <button onClick={signOut} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 12px', fontSize: '0.82rem', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <LogOut size={13} /> Logout
           </button>
@@ -505,8 +513,9 @@ export default function AdminDashboard({ profile }) {
       {/* TABS */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', padding: '0 6px' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 13px', border: 'none', background: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#C62828' : '#999', borderBottom: tab === t.key ? '2.5px solid #E53935' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s' }}>
-            {t.label}
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ padding: '13px 13px', border: 'none', background: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: tab === t.key ? '#C62828' : '#999', borderBottom: tab === t.key ? '2.5px solid #E53935' : '2.5px solid transparent', flexShrink: 0, transition: 'all .18s', display: 'flex', alignItems: 'center', gap: '5px', position: 'relative' }}>
+            <t.Icon size={15} /> {t.label}
+            {t.alert && <span style={{background:'#E53935',color:'#fff',fontSize:'.6rem',fontWeight:800,padding:'1px 5px',borderRadius:'100px',minWidth:'16px',textAlign:'center'}}>{t.alertCount}</span>}
           </button>
         ))}
       </div>
@@ -756,31 +765,42 @@ export default function AdminDashboard({ profile }) {
             ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>🛺</div><div>{driverSearch ? 'No drivers match your search' : 'No drivers yet'}</div></div>
             : filteredDrivers.map(d => {
               const assignedCampaign = busyDriverIds.has(d.id) ? campaigns.find(c => c.status === 'active' || c.status === 'paid') : null
+              const VIcon = d.vehicle_type ? (VEHICLE_ICONS_MAP[d.vehicle_type] || Truck) : Truck
+              const vColor = d.vehicle_type ? (VEHICLE_COLORS[d.vehicle_type] || '#888') : '#888'
               return (
                 <div key={d.id} style={{ ...card, border: busyDriverIds.has(d.id) ? '1.5px solid #FFE08A' : !d.is_verified ? '1.5px solid #FFAAAA' : '1px solid #E8E8E8' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <div style={{ fontWeight: 700 }}>{d.full_name}</div>
-                        {d.is_verified && <span style={{ color: '#1DB954', fontSize: '0.82rem' }}>✅ Verified</span>}
+                        {d.is_verified && <span style={{ color: '#1DB954', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '2px' }}><CheckCircle size={13}/> Verified</span>}
                         <span style={{
                           background: busyDriverIds.has(d.id) ? '#FFF8E6' : !d.is_verified ? '#FDECEA' : '#E6F9EE',
                           color: busyDriverIds.has(d.id) ? '#7A5900' : !d.is_verified ? '#C62828' : '#0A6B30',
                           fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
                           padding: '3px 8px', borderRadius: '100px'
                         }}>
-                          {busyDriverIds.has(d.id) ? '🔴 Engaged' : !d.is_verified ? '⚪ Unverified' : '🟢 Free'}
+                          {busyDriverIds.has(d.id) ? 'Engaged' : !d.is_verified ? 'Unverified' : 'Free'}
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>📞 {d.phone} · 📍 {d.city}</div>
-                      <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px' }}>🛺 {d.vehicle_number || 'No vehicle number'}</div>
-                      <div style={{ fontSize: '0.82rem', color: '#888' }}>💳 UPI: {d.upi_id || 'Not set'}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={13}/> {d.city} · <span style={{display:'flex',alignItems:'center',gap:'2px'}}>{d.phone}</span></div>
+                      <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}><VIcon size={13} style={{color:vColor}}/> {d.vehicle_number || 'No vehicle number'}</div>
+                      {/* Vehicle type badge */}
+                      {d.vehicle_type && (
+                        <div style={{display:'inline-flex',alignItems:'center',gap:'6px',background:vColor+'12',border:`1px solid ${vColor}30`,borderRadius:'8px',padding:'4px 10px',marginTop:'4px',marginBottom:'2px'}}>
+                          <VIcon size={12} style={{color:vColor}}/>
+                          <span style={{fontSize:'.72rem',fontWeight:700,color:vColor}}>{VEHICLE_TYPE_LABELS[d.vehicle_type]}</span>
+                          {d.fuel_type && <span style={{fontSize:'.68rem',color:'#888'}}>· {FUEL_LABELS[d.fuel_type]}</span>}
+                          {d.vehicle_size && <span style={{fontSize:'.68rem',color:'#888'}}>· {SIZE_LABELS[d.vehicle_size]}</span>}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.82rem', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}><CreditCard size={13}/> UPI: {d.upi_id || 'Not set'}</div>
                       <div style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px' }}>Joined: {new Date(d.created_at).toLocaleDateString('en-IN')}</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
                       {!d.is_verified && (
                         <button className="action-btn" style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`verify_${d.id}`] ? .6 : 1 }} onClick={() => handleVerifyDriver(d.id)} disabled={actionLoading[`verify_${d.id}`]}>
-                          <CheckCircle size={14} /> {actionLoading[`verify_${d.id}`] ? 'Verifying…' : 'Verify + Auto-Assign'}
+                          <CheckCircle size={14} /> {actionLoading[`verify_${d.id}`] ? 'Verifying...' : 'Verify + Auto-Assign'}
                         </button>
                       )}
                     </div>
@@ -892,6 +912,11 @@ export default function AdminDashboard({ profile }) {
         </div>}
 
         {tab === 'leads' && <div className="tab-content"><EnterpriseLeads /></div>}
+
+        {/* ACCOUNT */}
+        {tab === 'account' && <div className="tab-content">
+          <AccountSection profile={profile} role="admin" />
+        </div>}
 
       </div>
     </div>
