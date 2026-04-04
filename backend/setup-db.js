@@ -74,6 +74,8 @@ DO $$ BEGIN
   CREATE POLICY "Admins can update campaigns" ON campaigns FOR UPDATE USING (
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
   );
+  DROP POLICY IF EXISTS "Anyone can read campaigns" ON campaigns;
+  CREATE POLICY "Anyone can read campaigns" ON campaigns FOR SELECT TO authenticated USING (true);
 END $$;
 
 CREATE TABLE IF NOT EXISTS jobs (

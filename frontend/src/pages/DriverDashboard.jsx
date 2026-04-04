@@ -386,31 +386,36 @@ export default function DriverDashboard({ profile }) {
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Your Ad Banner</div>
                   <img src={activeJob.campaigns.banner_url} alt="campaign banner" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '10px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
-                  <button
-                    className="action-btn"
-                    onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
-                      plan: activeJob.campaigns?.plans?.name,
-                      city: activeJob.campaigns?.city,
-                      area: activeJob.campaigns?.area
-                    })}
-                    disabled={pdfLoading}
-                    style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
-                  >
-                    <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
-                  </button>
-                  {/* Print Incentive Card */}
-                  <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginTop: '10px' }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Printer size={15} /> Print & Earn ₹175 Bonus!
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
-                      1. Download the banner PDF above<br/>
-                      2. Get it printed at any nearby print shop<br/>
-                      3. Put it on your rickshaw<br/>
-                      4. Upload your first proof photo<br/>
-                      ✅ Once approved by admin, ₹175 print allowance will be credited!
-                    </div>
-                  </div>
+                  
+                  {!earnings?.some(e => e.driver_job_id === activeJob.id && e.type === 'print_reimbursement') && (
+                    <>
+                      <button
+                        className="action-btn"
+                        onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
+                          plan: activeJob.campaigns?.plans?.name,
+                          city: activeJob.campaigns?.city,
+                          area: activeJob.campaigns?.area
+                        })}
+                        disabled={pdfLoading}
+                        style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
+                      >
+                        <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
+                      </button>
+                      {/* Print Incentive Card */}
+                      <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginTop: '10px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Printer size={15} /> Print & Earn ₹175 Bonus!
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                          1. Download the banner PDF above<br/>
+                          2. Get it printed at any nearby print shop<br/>
+                          3. Put it on your rickshaw<br/>
+                          4. Upload your first proof photo<br/>
+                          ✅ Once approved by admin, ₹175 print allowance will be credited!
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -464,27 +469,32 @@ export default function DriverDashboard({ profile }) {
                   <div style={{ marginBottom: '14px' }}>
                     <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Your Ad Banner</div>
                     <img src={activeJob.campaigns.banner_url} alt="campaign banner" style={{ width: '100%', maxHeight: '120px', objectFit: 'contain', borderRadius: '10px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
-                    <button
-                      className="action-btn"
-                      onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
-                        plan: activeJob.campaigns?.plans?.name,
-                        city: activeJob.campaigns?.city,
-                        area: activeJob.campaigns?.area
-                      })}
-                      disabled={pdfLoading}
-                      style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
-                    >
-                      <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
-                    </button>
-                    {/* Print Incentive */}
-                    <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginTop: '10px' }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Printer size={15} /> Print & Earn ₹175 Bonus!
-                      </div>
-                      <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
-                        Download → Print → Put on rickshaw → Upload proof photo → Get ₹175 credited!
-                      </div>
-                    </div>
+                    
+                    {!earnings?.some(e => e.driver_job_id === activeJob.id && e.type === 'print_reimbursement') && (
+                      <>
+                        <button
+                          className="action-btn"
+                          onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
+                            plan: activeJob.campaigns?.plans?.name,
+                            city: activeJob.campaigns?.city,
+                            area: activeJob.campaigns?.area
+                          })}
+                          disabled={pdfLoading}
+                          style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
+                        >
+                          <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
+                        </button>
+                        {/* Print Incentive */}
+                        <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginTop: '10px' }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Printer size={15} /> Print & Earn ₹175 Bonus!
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                            Download → Print → Put on rickshaw → Upload proof photo → Get ₹175 credited!
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
