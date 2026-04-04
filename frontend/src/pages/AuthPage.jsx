@@ -179,7 +179,7 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
     if (setupMode&&userId) {
       const profileData = {
         id: userId, full_name: form.full_name, phone: form.phone,
-        city: form.city, role, email: form.email || null,
+        city: form.city, role,
         date_of_birth: form.dob || null
       }
       if (role === 'driver') {
@@ -203,7 +203,7 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
 
     const profileData = {
       id: data.user.id, full_name: form.full_name, phone: form.phone,
-      city: form.city, role, email: form.email,
+      city: form.city, role,
       date_of_birth: form.dob || null
     }
     if (role === 'driver') {
@@ -218,13 +218,13 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
     }
 
     const {error:pe} = await supabase.from('users').upsert(profileData, {onConflict:'id'})
-    if (pe) { console.error('Profile save error:', pe); toast.error('Profile save failed: ' + pe.message) }
+    if (pe) { toast.error('Profile save failed: ' + pe.message); setBusy(false); return }
 
-    try {
-      const {error:loginErr} = await supabase.auth.signInWithPassword({email:form.email,password:form.password})
-      if (loginErr) toast.error('Account created but auto-login failed: ' + loginErr.message)
-      else toast.success('Account created! Welcome to AdWheels')
-    } catch(e) { toast.error('Account created! Please login manually.') }
+    // Sign out after signup and redirect to login page
+    await supabase.auth.signOut()
+    toast.success('Account created successfully! Please login with your credentials.')
+    setScreen('login')
+    setForm(f => ({...f, password: ''}))
     setBusy(false)
   }
 
