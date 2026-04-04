@@ -236,6 +236,9 @@ export default function AdminDashboard({ profile }) {
   // Driver search
   const [driverSearch, setDriverSearch] = useState('')
 
+  // Proof filter
+  const [proofFilter, setProofFilter] = useState('all')
+
   // Loading states for actions
   const [actionLoading, setActionLoading] = useState({})
 
@@ -274,8 +277,25 @@ export default function AdminDashboard({ profile }) {
   }
 
   async function fetchProofs() {
-    const { data } = await supabase.from('daily_proofs').select('*, driver_id, users(full_name), driver_jobs(campaigns(city,area,plans(name,driver_payout)))').order('created_at', { ascending: false })
-    setProofs(data || [])
+    try {
+      const { data, error } = await supabase
+        .from('daily_proofs')
+        .select('*, users!daily_proofs_driver_id_fkey(full_name), driver_jobs(campaigns(city,area,plans(name,driver_payout)))')
+        .order('proof_date', { ascending: false })
+      if (error) {
+        // Fallback query without explicit FK name
+        const { data: fallbackData } = await supabase
+          .from('daily_proofs')
+          .select('*, driver_jobs(campaigns(city,area,plans(name,driver_payout)))')
+          .order('proof_date', { ascending: false })
+        setProofs(fallbackData || [])
+      } else {
+        setProofs(data || [])
+      }
+    } catch (err) {
+      toast.error('Failed to load proofs')
+      setProofs([])
+    }
   }
   async function fetchPayouts() {
     const { data } = await supabase.from('payouts').select('*, users(full_name,phone)').order('requested_at', { ascending: false })
@@ -811,56 +831,140 @@ export default function AdminDashboard({ profile }) {
           }
         </div>}
 
-        {/* PROOFS */}
+        {/* PROOFS — Date-wise with Status Filters */}
         {tab === 'proofs' && <div className="tab-content">
-          {proofs.length === 0
-            ? <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}><div style={{ fontSize: '3rem', marginBottom: '10px' }}>📷</div><div>No photos yet</div></div>
-            : proofs.map(p => (
-              <div key={p.id} style={{ ...card, border: p.status === 'pending' ? '1.5px solid #FFE08A' : '1px solid #E8E8E8' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>{p.users?.full_name}</div>
-                    <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '8px' }}>{p.driver_jobs?.campaigns?.plans?.name} · {p.driver_jobs?.campaigns?.city} · {p.proof_date}</div>
-                    <span style={badge(p.status)}>{p.status}</span>
-                    {p.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                        <button
-                          className="action-btn"
-                          style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`approve_${p.id}`] ? .6 : 1 }}
-                          onClick={() => handleApproveProof(p.id, p.driver_job_id, p.driver_id, p.driver_jobs?.campaigns?.plans?.driver_payout)}
-                          disabled={actionLoading[`approve_${p.id}`]}
-                        >
-                          <CheckCircle size={14} /> {actionLoading[`approve_${p.id}`] ? 'Approving…' : `Approve + ₹${Math.round((p.driver_jobs?.campaigns?.plans?.driver_payout || 600) / 30)}`}
-                        </button>
-                        <button
-                          className="action-btn"
-                          style={{ ...btn('#FDECEA', '#C62828'), opacity: actionLoading[`reject_${p.id}`] ? .6 : 1 }}
-                          onClick={() => handleRejectProof(p.id)}
-                          disabled={actionLoading[`reject_${p.id}`]}
-                        >
-                          <XCircle size={14} /> {actionLoading[`reject_${p.id}`] ? 'Rejecting…' : 'Reject'}
-                        </button>
-                      </div>
-                    )}
+          {/* Status filter tabs */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            {[
+              { key: 'all', label: 'All', count: proofs.length },
+              { key: 'pending', label: 'Pending', count: proofs.filter(p => p.status === 'pending').length, color: '#FF8C00' },
+              { key: 'approved', label: 'Approved', count: proofs.filter(p => p.status === 'approved').length, color: '#1DB954' },
+              { key: 'rejected', label: 'Rejected', count: proofs.filter(p => p.status === 'rejected').length, color: '#E53935' },
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setProofFilter(f.key)}
+                style={{
+                  background: proofFilter === f.key ? (f.color || '#FFBF00') : '#fff',
+                  color: proofFilter === f.key ? '#fff' : '#666',
+                  border: proofFilter === f.key ? `1.5px solid ${f.color || '#D49800'}` : '1.5px solid #E8E8E8',
+                  borderRadius: '100px', padding: '8px 16px', fontSize: '0.82rem',
+                  fontWeight: 700, cursor: 'pointer', display: 'inline-flex',
+                  alignItems: 'center', gap: '5px', transition: 'all .18s'
+                }}
+              >
+                {f.label}
+                <span style={{
+                  background: proofFilter === f.key ? 'rgba(255,255,255,0.3)' : '#F0F0F0',
+                  color: proofFilter === f.key ? '#fff' : '#888',
+                  fontSize: '0.7rem', fontWeight: 800, padding: '2px 7px',
+                  borderRadius: '100px', minWidth: '20px', textAlign: 'center'
+                }}>{f.count}</span>
+              </button>
+            ))}
+          </div>
+
+          {(() => {
+            const filtered = proofFilter === 'all' ? proofs : proofs.filter(p => p.status === proofFilter)
+            if (filtered.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '48px', color: '#bbb' }}>
+                  <Camera size={48} style={{ color: '#ddd', marginBottom: '10px' }} />
+                  <div style={{ fontWeight: 700, color: '#999', marginBottom: '4px' }}>
+                    {proofFilter === 'all' ? 'No photos yet' : `No ${proofFilter} photos`}
                   </div>
-                  {/* Clickable proof image — opens lightbox */}
-                  {p.photo_url && (
-                    <div
-                      onClick={() => setLightboxSrc(p.photo_url)}
-                      style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0 }}
-                      title="Click to enlarge"
-                    >
-                      <img src={p.photo_url} alt="proof" style={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E8E8E8' }} />
-                      <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.55)', borderRadius: '6px', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <Eye size={11} color="#fff" />
-                        <span style={{ fontSize: '0.6rem', color: '#fff', fontWeight: 700 }}>View</span>
-                      </div>
-                    </div>
-                  )}
+                  <div style={{ fontSize: '0.84rem' }}>Photos will appear here when drivers upload them.</div>
                 </div>
+              )
+            }
+
+            // Group by date
+            const grouped = {}
+            filtered.forEach(p => {
+              const date = p.proof_date || 'Unknown'
+              if (!grouped[date]) grouped[date] = []
+              grouped[date].push(p)
+            })
+            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+            const today = new Date().toISOString().split('T')[0]
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+            const formatDateLabel = (d) => {
+              if (d === today) return 'Today'
+              if (d === yesterday) return 'Yesterday'
+              if (d === 'Unknown') return 'Unknown Date'
+              return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+            }
+
+            return sortedDates.map(date => (
+              <div key={date} style={{ marginBottom: '22px' }}>
+                {/* Date header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: date === today ? '#D49800' : '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={14} style={{ color: date === today ? '#D49800' : '#888' }} />
+                    {formatDateLabel(date)}
+                  </div>
+                  <div style={{ height: '1px', flex: 1, background: '#E8E8E8' }} />
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#888', background: '#F5F5F5', padding: '3px 10px', borderRadius: '100px' }}>
+                    {grouped[date].length} photo{grouped[date].length > 1 ? 's' : ''}
+                    {grouped[date].filter(p => p.status === 'pending').length > 0 && (
+                      <span style={{ color: '#E53935', marginLeft: '4px' }}>
+                        · {grouped[date].filter(p => p.status === 'pending').length} pending
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                {/* Proof cards for this date */}
+                {grouped[date].map(p => (
+                  <div key={p.id} style={{ ...card, border: p.status === 'pending' ? '1.5px solid #FFE08A' : '1px solid #E8E8E8' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, marginBottom: '4px' }}>{p.users?.full_name || 'Driver'}</div>
+                        <div style={{ fontSize: '0.82rem', color: '#888', marginBottom: '8px' }}>
+                          {p.driver_jobs?.campaigns?.plans?.name || 'Campaign'} · {p.driver_jobs?.campaigns?.city || ''} · {p.proof_date}
+                        </div>
+                        <span style={badge(p.status)}>{p.status}</span>
+                        {p.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                            <button
+                              className="action-btn"
+                              style={{ ...btn('#1DB954', '#fff'), opacity: actionLoading[`approve_${p.id}`] ? .6 : 1 }}
+                              onClick={() => handleApproveProof(p.id, p.driver_job_id, p.driver_id, p.driver_jobs?.campaigns?.plans?.driver_payout)}
+                              disabled={actionLoading[`approve_${p.id}`]}
+                            >
+                              <CheckCircle size={14} /> {actionLoading[`approve_${p.id}`] ? 'Approving…' : `Approve + ₹${Math.round((p.driver_jobs?.campaigns?.plans?.driver_payout || 600) / 30)}`}
+                            </button>
+                            <button
+                              className="action-btn"
+                              style={{ ...btn('#FDECEA', '#C62828'), opacity: actionLoading[`reject_${p.id}`] ? .6 : 1 }}
+                              onClick={() => handleRejectProof(p.id)}
+                              disabled={actionLoading[`reject_${p.id}`]}
+                            >
+                              <XCircle size={14} /> {actionLoading[`reject_${p.id}`] ? 'Rejecting…' : 'Reject'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {/* Clickable proof image — opens lightbox */}
+                      {p.photo_url && (
+                        <div
+                          onClick={() => setLightboxSrc(p.photo_url)}
+                          style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0 }}
+                          title="Click to enlarge"
+                        >
+                          <img src={p.photo_url} alt="proof" style={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #E8E8E8' }} />
+                          <div style={{ position: 'absolute', bottom: '6px', right: '6px', background: 'rgba(0,0,0,0.55)', borderRadius: '6px', padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Eye size={11} color="#fff" />
+                            <span style={{ fontSize: '0.6rem', color: '#fff', fontWeight: 700 }}>View</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             ))
-          }
+          })()}
         </div>}
 
         {/* PAYOUTS */}

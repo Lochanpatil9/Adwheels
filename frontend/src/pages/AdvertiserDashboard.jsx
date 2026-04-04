@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, Upload, ChevronRight, RefreshCw, CheckCircle, Home, Megaphone, PlusCircle, BarChart3, UserCircle, MapPin, Truck, Zap, Bike } from 'lucide-react'
+import { LogOut, Upload, ChevronRight, RefreshCw, CheckCircle, Home, Megaphone, PlusCircle, BarChart3, UserCircle, MapPin, Truck, Zap, Bike, Camera } from 'lucide-react'
 import { createRazorpayOrder, verifyPayment, cancelCampaign, getCampaignStats, sendNotification } from '../lib/api'
 import NotificationBell from '../components/NotificationBell'
 import AccountSection from '../components/AccountSection'
@@ -50,7 +50,7 @@ function StatusTimeline({ status }) {
 }
 
 /* ═══════════ Campaign Creation Stepper ═══════════ */
-function CreateCampaignStepper({ profile, plans, onDone }) {
+function CreateCampaignStepper({ profile, plans, plansLoading, fetchPlans, onDone }) {
   const [step, setStep] = useState(1)
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [city, setCity] = useState(profile.city || 'indore')
@@ -117,44 +117,62 @@ function CreateCampaignStepper({ profile, plans, onDone }) {
       {step === 1 && (
         <div>
           <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: '16px', textAlign: 'center' }}>Select Your Plan</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '12px' }}>
-            {plans.map(p => {
-              const isSelected = selectedPlan?.id === p.id
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedPlan(p)}
-                  style={{
-                    border: isSelected ? '2px solid #FFBF00' : '1.5px solid #E8E8E8',
-                    borderRadius: '14px',
-                    padding: '20px',
-                    cursor: 'pointer',
-                    background: isSelected ? '#FFF8E6' : '#fff',
-                    transition: 'all .2s',
-                    textAlign: 'center',
-                    transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                    boxShadow: isSelected ? '0 4px 16px rgba(255,191,0,.2)' : '0 2px 8px rgba(0,0,0,.04)'
-                  }}
-                >
-                  {p.is_urgent && <div style={{ background: '#FDECEA', color: '#C62828', fontSize: '0.65rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', display: 'inline-block', marginBottom: '8px' }}>⚡ URGENT</div>}
-                  <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.5rem', color: '#111', marginBottom: '2px' }}>{p.name}</div>
-                  <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2rem', color: '#D49800', lineHeight: 1, marginBottom: '8px' }}>₹{p.price.toLocaleString()}<span style={{ fontSize: '0.8rem', color: '#888' }}>/mo</span></div>
-                  <div style={{ fontSize: '0.82rem', color: '#666', lineHeight: 1.6 }}>
-                    {p.rickshaw_count} rickshaw{p.rickshaw_count > 1 ? 's' : ''}<br />
-                    ≈₹{Math.round(p.price / 30).toLocaleString()}/day
-                  </div>
-                  {isSelected && <div style={{ marginTop: '10px', color: '#D49800', fontWeight: 800, fontSize: '0.85rem' }}>✓ Selected</div>}
-                </div>
-              )
-            })}
-          </div>
-          <button
-            className="action-btn"
-            onClick={() => { if (!selectedPlan) return toast.error('Pick a plan'); setStep(2) }}
-            style={{ ...btn('#FFBF00', '#111'), width: '100%', justifyContent: 'center', marginTop: '20px' }}
-          >
-            Continue <ChevronRight size={16} />
-          </button>
+          {plansLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: '#888' }}>
+              <RefreshCw size={24} style={{ color: '#FFBF00', marginBottom: '10px', animation: 'spin 1s linear infinite' }} />
+              <div style={{ fontWeight: 600, fontSize: '0.92rem' }}>Loading plans...</div>
+            </div>
+          ) : plans.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: '#999' }}>
+              <Megaphone size={40} style={{ color: '#ddd', marginBottom: '10px' }} />
+              <div style={{ fontWeight: 700, marginBottom: '6px' }}>No plans available</div>
+              <div style={{ fontSize: '0.84rem', color: '#aaa' }}>Please contact support or try refreshing.</div>
+              <button className="action-btn" onClick={fetchPlans} style={{ ...btn('#FFBF00', '#111'), margin: '16px auto 0', padding: '10px 20px' }}>
+                <RefreshCw size={14} /> Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '12px' }}>
+                {plans.map(p => {
+                  const isSelected = selectedPlan?.id === p.id
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedPlan(p)}
+                      style={{
+                        border: isSelected ? '2px solid #FFBF00' : '1.5px solid #E8E8E8',
+                        borderRadius: '14px',
+                        padding: '20px',
+                        cursor: 'pointer',
+                        background: isSelected ? '#FFF8E6' : '#fff',
+                        transition: 'all .2s',
+                        textAlign: 'center',
+                        transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                        boxShadow: isSelected ? '0 4px 16px rgba(255,191,0,.2)' : '0 2px 8px rgba(0,0,0,.04)'
+                      }}
+                    >
+                      {p.is_urgent && <div style={{ background: '#FDECEA', color: '#C62828', fontSize: '0.65rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', display: 'inline-block', marginBottom: '8px' }}><Zap size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} /> URGENT</div>}
+                      <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.5rem', color: '#111', marginBottom: '2px' }}>{p.name}</div>
+                      <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '2rem', color: '#D49800', lineHeight: 1, marginBottom: '8px' }}>₹{p.price.toLocaleString()}<span style={{ fontSize: '0.8rem', color: '#888' }}>/mo</span></div>
+                      <div style={{ fontSize: '0.82rem', color: '#666', lineHeight: 1.6 }}>
+                        {p.rickshaw_count} rickshaw{p.rickshaw_count > 1 ? 's' : ''}<br />
+                        ≈₹{Math.round(p.price / 30).toLocaleString()}/day
+                      </div>
+                      {isSelected && <div style={{ marginTop: '10px', color: '#D49800', fontWeight: 800, fontSize: '0.85rem' }}><CheckCircle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '3px' }} /> Selected</div>}
+                    </div>
+                  )
+                })}
+              </div>
+              <button
+                className="action-btn"
+                onClick={() => { if (!selectedPlan) return toast.error('Pick a plan'); setStep(2) }}
+                style={{ ...btn('#FFBF00', '#111'), width: '100%', justifyContent: 'center', marginTop: '20px' }}
+              >
+                Continue <ChevronRight size={16} />
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -230,8 +248,10 @@ export default function AdvertiserDashboard({ profile }) {
   const [tab, setTab] = useState('home')
   const [campaigns, setCampaigns] = useState([])
   const [plans, setPlans] = useState([])
+  const [plansLoading, setPlansLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [stats, setStats] = useState(null)
+  const [campaignProofs, setCampaignProofs] = useState([])
   const [selectedCampaign, setSelectedCampaign] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -244,8 +264,17 @@ export default function AdvertiserDashboard({ profile }) {
     setCampaigns(data || [])
   }
   async function fetchPlans() {
-    const { data } = await supabase.from('plans').select('*').eq('is_active', true).order('price', { ascending: true })
-    setPlans(data || [])
+    setPlansLoading(true)
+    // Try with is_active filter first, fallback to all plans
+    let { data, error } = await supabase.from('plans').select('*').eq('is_active', true).order('price', { ascending: true })
+    if (error || !data || data.length === 0) {
+      // Fallback: fetch all plans without is_active filter
+      const fallback = await supabase.from('plans').select('*').order('price', { ascending: true })
+      data = fallback.data || []
+      if (fallback.error) toast.error('Failed to load plans')
+    }
+    setPlans(data)
+    setPlansLoading(false)
   }
 
   async function handlePayment(campaign) {
@@ -276,11 +305,18 @@ export default function AdvertiserDashboard({ profile }) {
   }
 
   async function loadStats(campaign) {
-    setSelectedCampaign(campaign); setStats(null); setTab('stats')
+    setSelectedCampaign(campaign); setStats(null); setCampaignProofs([]); setTab('stats')
     try {
       const s = await getCampaignStats(campaign.id)
       setStats(s)
-    } catch { setStats({ drivers: 0, proofs: [], totalProofs: 0, approvedProofs: 0 }) }
+      // Fetch actual proof photos for this campaign directly
+      const { data: jobs } = await supabase.from('driver_jobs').select('id').eq('campaign_id', campaign.id).neq('status', 'rejected')
+      if (jobs && jobs.length > 0) {
+        const jobIds = jobs.map(j => j.id)
+        const { data: proofs } = await supabase.from('daily_proofs').select('*, users(full_name)').in('driver_job_id', jobIds).order('proof_date', { ascending: false })
+        setCampaignProofs(proofs || [])
+      }
+    } catch { setStats({ drivers: 0, totalProofs: 0, approvedProofs: 0 }); setCampaignProofs([]) }
   }
 
   const activeCampaigns = campaigns.filter(c => c.status === 'active').length
@@ -425,6 +461,8 @@ export default function AdvertiserDashboard({ profile }) {
           <CreateCampaignStepper
             profile={profile}
             plans={plans}
+            plansLoading={plansLoading}
+            fetchPlans={fetchPlans}
             onDone={(created) => {
               setCreating(false)
               fetchCampaigns()
@@ -523,25 +561,51 @@ export default function AdvertiserDashboard({ profile }) {
                     </div>
                   )}
 
-                  {/* Proof Photo Gallery */}
-                  {stats.proofs && stats.proofs.length > 0 && (
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px' }}>📸 Proof Photos</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '10px' }}>
-                        {stats.proofs.slice(0, 15).map((p, i) => (
-                          <div key={i} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E8E8', aspectRatio: '4/3' }}>
-                            <img src={p.photo_url} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent,rgba(0,0,0,.7))', padding: '6px 8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={badge(p.status)}>{p.status}</span>
-                                <span style={{ fontSize: '0.6rem', color: '#ddd', fontWeight: 600 }}>{p.proof_date || ''}</span>
-                              </div>
+                  {/* Proof Photo Gallery — Date-wise */}
+                  {campaignProofs.length > 0 && (() => {
+                    // Group proofs by date
+                    const grouped = {}
+                    campaignProofs.forEach(p => {
+                      const date = p.proof_date || 'Unknown'
+                      if (!grouped[date]) grouped[date] = []
+                      grouped[date].push(p)
+                    })
+                    const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+                    const today = new Date().toISOString().split('T')[0]
+                    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                    const formatDateLabel = (d) => {
+                      if (d === today) return 'Today'
+                      if (d === yesterday) return 'Yesterday'
+                      return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    }
+                    return (
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Camera size={16} style={{ color: '#D49800' }} /> Proof Photos ({campaignProofs.length})</div>
+                        {sortedDates.map(date => (
+                          <div key={date} style={{ marginBottom: '18px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#374151' }}>{formatDateLabel(date)}</div>
+                              <div style={{ height: '1px', flex: 1, background: '#E8E8E8' }} />
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#888', background: '#F5F5F5', padding: '2px 8px', borderRadius: '100px' }}>{grouped[date].length} photo{grouped[date].length > 1 ? 's' : ''}</span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '10px' }}>
+                              {grouped[date].map((p, i) => (
+                                <div key={i} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E8E8E8', aspectRatio: '4/3' }}>
+                                  <img src={p.photo_url} alt="proof" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent,rgba(0,0,0,.7))', padding: '6px 8px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={badge(p.status)}>{p.status}</span>
+                                      <span style={{ fontSize: '0.6rem', color: '#ddd', fontWeight: 600 }}>{p.users?.full_name || ''}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </>
               }
             </div>
