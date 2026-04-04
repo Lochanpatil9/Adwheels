@@ -369,16 +369,27 @@ export default function AdminDashboard({ profile }) {
     setActionLoading(prev => ({ ...prev, [`approve_${proofId}`]: true }))
     const { error } = await supabase.from('daily_proofs').update({ status: 'approved', reviewed_by: profile.id }).eq('id', proofId)
     if (error) { toast.error(error.message); setActionLoading(prev => ({ ...prev, [`approve_${proofId}`]: false })); return }
+    
+    // Add daily amount
     const amount = Math.round((driverPayout || 600) / 30)
     await supabase.from('earnings').insert({ driver_id: driverId, driver_job_id: driverJobId, amount, earning_date: new Date().toISOString().split('T')[0], type: 'daily' })
-    toast.success(`✅ Approved + ₹${amount} added`)
+    
+    // Check if this is the first proof for this job (i.e. no print reimbursement yet)
+    let bonusText = ''
+    const { data: existingBonus } = await supabase.from('earnings').select('id').eq('driver_job_id', driverJobId).eq('type', 'print_reimbursement')
+    if (!existingBonus || existingBonus.length === 0) {
+      await supabase.from('earnings').insert({ driver_id: driverId, driver_job_id: driverJobId, amount: 175, earning_date: new Date().toISOString().split('T')[0], type: 'print_reimbursement' })
+      bonusText = ' + ₹175 print bonus'
+    }
+
+    toast.success(`✅ Approved: +₹${amount}${bonusText}`)
 
     try {
       await sendNotification({
         userId: driverId,
         type: 'proof_approved',
         title: '✅ Proof Approved!',
-        message: `Your daily proof was approved and ₹${amount} has been added to your earnings.`
+        message: `Your daily proof was approved and ₹${amount}${bonusText} has been added to your earnings.`
       })
     } catch (notifErr) {
       console.error('Proof approval notification error:', notifErr)

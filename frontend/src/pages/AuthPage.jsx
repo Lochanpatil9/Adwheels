@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import { Truck, Building2, ChevronRight, ChevronLeft, Lock, Mail, User, Phone, MapPin, Calendar, Fuel, Maximize, Camera, CheckCircle, Zap, Bike, Eye, EyeOff, ShieldCheck, X as XIcon, Check } from 'lucide-react'
-
+import { autoAssignNewDriver } from '../lib/api'
 const INP = {width:'100%',padding:'13px 15px',fontSize:'.95rem',border:'1.5px solid #E2E8F0',borderRadius:'10px',background:'#fff',color:'#0F172A',outline:'none',fontFamily:'inherit',marginBottom:'14px',transition:'border-color .2s,box-shadow .2s'}
 const LBL = {display:'block',fontSize:'.74rem',fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'#64748B',marginBottom:'6px'}
 const BTN = {width:'100%',padding:'14px',background:'linear-gradient(135deg,#FFBF00,#FF8C00)',color:'#111',fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:'1rem',border:'none',borderRadius:'12px',cursor:'pointer',boxShadow:'0 4px 14px rgba(255,191,0,.4)',transition:'all .2s',display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',letterSpacing:'-.01em'}
@@ -123,20 +123,29 @@ const SIZE_LABELS = { small: 'Small', medium: 'Medium', large: 'Large' }
 const SIZE_DESC = { small: 'Compact · Less ad space', medium: 'Standard · Regular ad space', large: 'Full-size · Maximum ad space' }
 
 export default function AuthPage({ setupMode = false, userId = null } = {}) {
+  const { fetchProfile, signOut, user } = useAuth()
   const [screen, setScreen] = useState(setupMode ? 'role' : 'login')
   const [role,   setRole]   = useState(null)
   const [busy,   setBusy]   = useState(false)
   const [showPwd, setShowPwd] = useState(false)
+
+  // Auto-fill from Google OAuth user metadata if available
+  const googleMeta = user?.user_metadata || {}
   const [form,   setForm]   = useState({
-    email:'', password:'', full_name:'', phone:'', city:'', dob:'',
-    vehicle_number:'', vehicle_type:'', fuel_type:'', vehicle_size:'',
-    vehicle_make:'', vehicle_model:''
+    email: googleMeta.email || user?.email || '',
+    password: '',
+    full_name: googleMeta.full_name || googleMeta.name || '',
+    phone: googleMeta.phone || '',
+    city: '',
+    dob: '',
+    vehicle_number: '', vehicle_type: '', fuel_type: '', vehicle_size: '',
+    vehicle_make: '', vehicle_model: ''
   })
-  const { fetchProfile, signOut } = useAuth()
   const up = (k,v) => setForm(f=>({...f,[k]:v}))
 
   // Get selected vehicle config
   const selectedVehicle = VEHICLE_TYPES.find(v => v.id === form.vehicle_type)
+
 
   async function doLogin() {
     if (!form.email||!form.password) return toast.error('Enter your email and password')
@@ -151,6 +160,20 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
       else toast.error(error.message)
     }
     setBusy(false)
+  }
+
+  async function doGoogleLogin() {
+    setBusy(true)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/dashboard'
+      }
+    })
+    if (error) {
+      toast.error('Google login failed: ' + error.message)
+      setBusy(false)
+    }
   }
 
   async function doForgot() {
@@ -180,9 +203,11 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
       const profileData = {
         id: userId, full_name: form.full_name, phone: form.phone,
         city: form.city, role,
-        date_of_birth: form.dob || null
+        date_of_birth: form.dob || null,
+        avatar_url: googleMeta.picture || googleMeta.avatar_url || null
       }
       if (role === 'driver') {
+        profileData.is_verified = true
         Object.assign(profileData, {
           vehicle_number: form.vehicle_number || null,
           vehicle_type: form.vehicle_type, fuel_type: form.fuel_type,
@@ -194,7 +219,13 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
       }
       const {error} = await supabase.from('users').upsert(profileData)
       if (error) toast.error(error.message)
-      else { toast.success('Setup complete! Welcome to AdWheels'); await fetchProfile(userId) }
+      else { 
+        if (role === 'driver') {
+          try { await autoAssignNewDriver(userId) } catch(e) { }
+        }
+        toast.success('Setup complete! Welcome to AdWheels'); 
+        await fetchProfile(userId) 
+      }
       setBusy(false); return
     }
 
@@ -204,9 +235,11 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
     const profileData = {
       id: data.user.id, full_name: form.full_name, phone: form.phone,
       city: form.city, role,
-      date_of_birth: form.dob || null
+      date_of_birth: form.dob || null,
+      avatar_url: googleMeta.picture || googleMeta.avatar_url || null
     }
     if (role === 'driver') {
+      profileData.is_verified = true
       Object.assign(profileData, {
         vehicle_number: form.vehicle_number || null,
         vehicle_type: form.vehicle_type, fuel_type: form.fuel_type,
@@ -219,6 +252,10 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
 
     const {error:pe} = await supabase.from('users').upsert(profileData, {onConflict:'id'})
     if (pe) { toast.error('Profile save failed: ' + pe.message); setBusy(false); return }
+
+    if (role === 'driver') {
+      try { await autoAssignNewDriver(data.user.id) } catch(e) { }
+    }
 
     // Sign out after signup and redirect to login page
     await supabase.auth.signOut()
@@ -319,6 +356,31 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
               </div>
 
               <button style={BTN} className="auth-btn" onClick={doLogin} disabled={busy}>{busy?'Logging in...':'Login to AdWheels'}<ChevronRight size={16}/></button>
+
+              {/* Google Login Divider */}
+              <div style={{display:'flex',alignItems:'center',gap:'14px',margin:'20px 0'}}>
+                <div style={{flex:1,height:'1px',background:'#E2E8F0'}}/>
+                <span style={{fontSize:'.82rem',color:'#94A3B8',fontWeight:600,whiteSpace:'nowrap'}}>or continue with</span>
+                <div style={{flex:1,height:'1px',background:'#E2E8F0'}}/>
+              </div>
+
+              {/* Google Sign In Button */}
+              <button
+                onClick={doGoogleLogin}
+                disabled={busy}
+                style={{
+                  width:'100%',padding:'13px',background:'#fff',color:'#374151',
+                  fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:'.95rem',
+                  border:'1.5px solid #E2E8F0',borderRadius:'12px',cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',
+                  transition:'all .2s',boxShadow:'0 1px 3px rgba(0,0,0,.05)'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.background = '#F9FAFB' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#fff' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                Sign in with Google
+              </button>
 
               <button onClick={doForgot} style={{display:'block',width:'100%',marginTop:'14px',background:'none',border:'none',color:'#64748B',fontSize:'.87rem',cursor:'pointer',textAlign:'center',textDecoration:'underline',fontFamily:'DM Sans,sans-serif'}}>
                 Forgot password?

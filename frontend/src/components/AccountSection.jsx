@@ -55,7 +55,7 @@ function SectionCard({ title, icon: Icon, children, iconColor = '#64748B' }) {
 }
 
 export default function AccountSection({ profile, role }) {
-  const { signOut, fetchProfile } = useAuth()
+  const { signOut, fetchProfile, user } = useAuth()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -67,7 +67,6 @@ export default function AccountSection({ profile, role }) {
     full_name: profile.full_name || '',
     phone: profile.phone || '',
     city: profile.city || '',
-    email: profile.email || '',
     date_of_birth: profile.date_of_birth || '',
     upi_id: profile.upi_id || '',
     vehicle_number: profile.vehicle_number || '',
@@ -84,7 +83,6 @@ export default function AccountSection({ profile, role }) {
       full_name: form.full_name,
       phone: form.phone,
       city: form.city,
-      email: form.email || null,
       date_of_birth: form.date_of_birth || null
     }
     if (role === 'driver') {
@@ -216,7 +214,7 @@ export default function AccountSection({ profile, role }) {
       <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
         {editing ? (
           <div style={{display:'flex',gap:'8px'}}>
-            <button onClick={()=>{setEditing(false);setForm({full_name:profile.full_name||'',phone:profile.phone||'',city:profile.city||'',email:profile.email||'',date_of_birth:profile.date_of_birth||'',upi_id:profile.upi_id||'',vehicle_number:profile.vehicle_number||'',vehicle_make:profile.vehicle_make||'',vehicle_model:profile.vehicle_model||''})}} style={{background:'#F5F5F5',border:'1px solid #E8E8E8',borderRadius:'10px',padding:'8px 16px',fontSize:'.84rem',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',color:'#666'}}>
+            <button onClick={()=>{setEditing(false);setForm({full_name:profile.full_name||'',phone:profile.phone||'',city:profile.city||'',date_of_birth:profile.date_of_birth||'',upi_id:profile.upi_id||'',vehicle_number:profile.vehicle_number||'',vehicle_make:profile.vehicle_make||'',vehicle_model:profile.vehicle_model||''})}} style={{background:'#F5F5F5',border:'1px solid #E8E8E8',borderRadius:'10px',padding:'8px 16px',fontSize:'.84rem',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',color:'#666'}}>
               <X size={14}/> Cancel
             </button>
             <button onClick={handleSave} disabled={saving} style={{background:'#1DB954',color:'#fff',border:'none',borderRadius:'10px',padding:'8px 16px',fontSize:'.84rem',fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',opacity:saving?.6:1}}>
@@ -239,7 +237,7 @@ export default function AccountSection({ profile, role }) {
             <label style={{fontSize:'.72rem',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'#94A3B8',display:'block',marginBottom:'5px'}}>Phone</label>
             <input style={inputStyle} value={form.phone} onChange={e=>up('phone',e.target.value)} placeholder="Phone number"/>
             <label style={{fontSize:'.72rem',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'#94A3B8',display:'block',marginBottom:'5px'}}>Email</label>
-            <input style={inputStyle} type="email" value={form.email} onChange={e=>up('email',e.target.value)} placeholder="Email address"/>
+            <input style={{...inputStyle,background:'#F8FAFC',color:'#94A3B8',cursor:'not-allowed'}} type="email" value={user?.email || ''} disabled title="Email is managed by your login account"/>
             <label style={{fontSize:'.72rem',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'#94A3B8',display:'block',marginBottom:'5px'}}>Date of Birth</label>
             <input style={inputStyle} type="date" value={form.date_of_birth} onChange={e=>up('date_of_birth',e.target.value)}/>
             <label style={{fontSize:'.72rem',fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'#94A3B8',display:'block',marginBottom:'5px'}}>City</label>
@@ -252,7 +250,7 @@ export default function AccountSection({ profile, role }) {
           <>
             <InfoRow icon={User} label="Full Name" value={profile.full_name} iconColor="#1565C0"/>
             <InfoRow icon={Phone} label="Phone" value={profile.phone} iconColor="#10B981"/>
-            <InfoRow icon={Mail} label="Email" value={profile.email} iconColor="#D97706"/>
+            <InfoRow icon={Mail} label="Email" value={user?.email} iconColor="#D97706"/>
             <InfoRow icon={Calendar} label="Date of Birth" value={profile.date_of_birth ? new Date(profile.date_of_birth).toLocaleDateString('en-IN') : null} iconColor="#8B5CF6"/>
             <InfoRow icon={MapPin} label="City" value={profile.city ? profile.city.charAt(0).toUpperCase() + profile.city.slice(1) : null} iconColor="#E53935"/>
           </>
@@ -351,7 +349,7 @@ export default function AccountSection({ profile, role }) {
       {role === 'advertiser' && (
         <SectionCard title="Business Information" icon={Building2} iconColor="#D97706">
           <InfoRow icon={Building2} label="Company" value={profile.company_name || profile.full_name} iconColor="#D97706"/>
-          <InfoRow icon={Mail} label="Business Email" value={profile.email} iconColor="#1565C0"/>
+          <InfoRow icon={Mail} label="Business Email" value={user?.email} iconColor="#1565C0"/>
           <InfoRow icon={Phone} label="Contact" value={profile.phone} iconColor="#10B981"/>
         </SectionCard>
       )}

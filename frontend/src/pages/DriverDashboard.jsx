@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { LogOut, Upload, CheckCircle, XCircle, Wallet, Camera, RefreshCw, Home, Briefcase, IndianRupee, CreditCard, UserCircle, Truck, Zap, Bike, MapPin, Flame, Info, Calendar as CalendarIcon, Gift, Printer } from 'lucide-react'
+import { LogOut, Upload, CheckCircle, XCircle, Wallet, Camera, RefreshCw, Home, Briefcase, IndianRupee, CreditCard, UserCircle, Truck, Zap, Bike, MapPin, Flame, Info, Calendar as CalendarIcon, Gift, Printer, Download } from 'lucide-react'
 import { sendNotification } from '../lib/api'
 import NotificationBell from '../components/NotificationBell'
 import AccountSection from '../components/AccountSection'
+import { jsPDF } from 'jspdf'
 
 /* ── Shared light-theme style helpers ── */
 const card = { background: '#fff', border: '1px solid #E8E8E8', borderRadius: '16px', padding: '20px', marginBottom: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }
@@ -166,6 +167,96 @@ export default function DriverDashboard({ profile }) {
   const historyJobs = jobs.filter(j => !['offered', 'active'].includes(j.status))
   const balance = totalEarnings - totalPaidOut
 
+  // ── Download Banner as Print-Ready PDF ──
+  const [pdfLoading, setPdfLoading] = useState(false)
+  async function downloadBannerPdf(bannerUrl, campaignInfo) {
+    if (!bannerUrl) return toast.error('No banner available')
+    setPdfLoading(true)
+    const toastId = toast.loading('Generating print-ready PDF...')
+    try {
+      // Fetch the image
+      const response = await fetch(bannerUrl)
+      const blob = await response.blob()
+      const imgDataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imgDataUrl
+      })
+
+      // Create landscape A4 PDF (297mm x 210mm)
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const pageW = 297, pageH = 210
+      const margin = 10
+
+      // Header
+      pdf.setFillColor(255, 191, 0)
+      pdf.rect(0, 0, pageW, 18, 'F')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(14)
+      pdf.setTextColor(17, 17, 17)
+      pdf.text('ADWHEELS - PRINT-READY BANNER', pageW / 2, 12, { align: 'center' })
+
+      // Campaign info
+      pdf.setFontSize(9)
+      pdf.setTextColor(100, 100, 100)
+      const infoText = `Campaign: ${campaignInfo.plan || 'N/A'}  |  City: ${campaignInfo.city || 'N/A'}  |  Area: ${campaignInfo.area || 'N/A'}`
+      pdf.text(infoText, pageW / 2, 24, { align: 'center' })
+
+      // Calculate image size to fill the page maximally
+      const contentTop = 28
+      const availW = pageW - margin * 2
+      const availH = pageH - contentTop - margin - 12 // leave room for footer
+      const imgRatio = img.width / img.height
+      const availRatio = availW / availH
+      let drawW, drawH
+      if (imgRatio > availRatio) {
+        drawW = availW
+        drawH = availW / imgRatio
+      } else {
+        drawH = availH
+        drawW = availH * imgRatio
+      }
+      const drawX = (pageW - drawW) / 2
+      const drawY = contentTop + (availH - drawH) / 2
+
+      // Add border around image area
+      pdf.setDrawColor(200, 200, 200)
+      pdf.setLineWidth(0.3)
+      pdf.rect(drawX - 1, drawY - 1, drawW + 2, drawH + 2)
+
+      // Add image at full quality
+      const imgType = blob.type.includes('png') ? 'PNG' : 'JPEG'
+      pdf.addImage(imgDataUrl, imgType, drawX, drawY, drawW, drawH, undefined, 'FAST')
+
+      // Footer instructions
+      pdf.setFontSize(8)
+      pdf.setTextColor(150, 150, 150)
+      pdf.text('Print this page at actual size (100%) on high-quality paper for best results. Do not scale to fit.', pageW / 2, pageH - 6, { align: 'center' })
+      pdf.text(`Generated: ${new Date().toLocaleDateString('en-IN')}  |  Image: ${img.width}x${img.height}px`, pageW / 2, pageH - 2, { align: 'center' })
+
+      // Save
+      const fileName = `AdWheels_Banner_${(campaignInfo.area || 'campaign').replace(/\s+/g, '_')}.pdf`
+      pdf.save(fileName)
+
+      toast.dismiss(toastId)
+      toast.success('PDF downloaded! Take it to a print shop.')
+    } catch (err) {
+      toast.dismiss(toastId)
+      console.error('PDF generation error:', err)
+      toast.error('Failed to generate PDF. Try downloading the image directly.')
+    }
+    setPdfLoading(false)
+  }
+
   // Calculate streak
   const streak = (() => {
     if (!earnings.length) return 0
@@ -290,11 +381,36 @@ export default function DriverDashboard({ profile }) {
               <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={14}/> {activeJob.campaigns?.city} — {activeJob.campaigns?.area}</div>
               <div style={{ fontSize: '0.87rem', color: '#555', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}><IndianRupee size={14}/> ₹{activeJob.campaigns?.plans?.driver_payout}/month + ₹175 for printing</div>
 
-              {/* Banner preview */}
+              {/* Banner preview + PDF download */}
               {activeJob.campaigns?.banner_url && (
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Your Ad Banner</div>
                   <img src={activeJob.campaigns.banner_url} alt="campaign banner" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '10px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
+                  <button
+                    className="action-btn"
+                    onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
+                      plan: activeJob.campaigns?.plans?.name,
+                      city: activeJob.campaigns?.city,
+                      area: activeJob.campaigns?.area
+                    })}
+                    disabled={pdfLoading}
+                    style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
+                  >
+                    <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
+                  </button>
+                  {/* Print Incentive Card */}
+                  <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginTop: '10px' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Printer size={15} /> Print & Earn ₹175 Bonus!
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                      1. Download the banner PDF above<br/>
+                      2. Get it printed at any nearby print shop<br/>
+                      3. Put it on your rickshaw<br/>
+                      4. Upload your first proof photo<br/>
+                      ✅ Once approved by admin, ₹175 print allowance will be credited!
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -321,6 +437,67 @@ export default function DriverDashboard({ profile }) {
 
         {/* ── JOBS ── */}
         {tab === 'jobs' && <div className="tab-content">
+
+          {/* Active Job */}
+          {activeJob && (
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '14px', color: '#111', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ width: '9px', height: '9px', background: '#1DB954', borderRadius: '50%', display: 'inline-block' }} />
+                Current Active Job
+              </div>
+              <div style={{ ...card, border: '1.5px solid #A3E4BE' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: '4px', color: '#111' }}>{activeJob.campaigns?.plans?.name} Plan</div>
+                <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={14}/> {activeJob.campaigns?.city} — {activeJob.campaigns?.area}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.6rem', color: '#0A6B30' }}>₹{activeJob.campaigns?.plans?.driver_payout}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per Month</div>
+                  </div>
+                  <div style={{ background: '#FFF8E6', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                    <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.6rem', color: '#7A5900' }}>+₹175</div>
+                    <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Print Allowance</div>
+                  </div>
+                </div>
+
+                {/* Banner + PDF Download */}
+                {activeJob.campaigns?.banner_url && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Your Ad Banner</div>
+                    <img src={activeJob.campaigns.banner_url} alt="campaign banner" style={{ width: '100%', maxHeight: '120px', objectFit: 'contain', borderRadius: '10px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
+                    <button
+                      className="action-btn"
+                      onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
+                        plan: activeJob.campaigns?.plans?.name,
+                        city: activeJob.campaigns?.city,
+                        area: activeJob.campaigns?.area
+                      })}
+                      disabled={pdfLoading}
+                      style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
+                    >
+                      <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
+                    </button>
+                    {/* Print Incentive */}
+                    <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginTop: '10px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Printer size={15} /> Print & Earn ₹175 Bonus!
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                        Download → Print → Put on rickshaw → Upload proof photo → Get ₹175 credited!
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {todayProof
+                  ? <div style={{ background: '#E6F9EE', borderRadius: '10px', padding: '10px 14px', fontSize: '0.87rem', color: '#0A6B30', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={15}/> Today's photo submitted — {todayProof.status}</div>
+                  : <div onClick={() => setTab('proof')} style={{ background: '#FFF8E6', borderRadius: '10px', padding: '12px 14px', fontSize: '0.87rem', color: '#7A5900', fontWeight: 700, cursor: 'pointer', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <Camera size={15}/> Upload today's photo to earn today →
+                  </div>
+                }
+              </div>
+            </div>
+          )}
+
           {offeredJobs.length > 0 && <>
             <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '14px', color: '#111' }}>New Job Offers</div>
             {offeredJobs.map(job => (
@@ -340,7 +517,19 @@ export default function DriverDashboard({ profile }) {
                     <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Print Money</div>
                   </div>
                 </div>
-                {job.campaigns?.banner_url && <img src={job.campaigns.banner_url} alt="banner" style={{ width: '100%', maxHeight: '90px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E8E8E8', marginBottom: '14px', background: '#fafafa' }} />}
+                {job.campaigns?.banner_url && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <img src={job.campaigns.banner_url} alt="banner" style={{ width: '100%', maxHeight: '90px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
+                    <button
+                      className="action-btn"
+                      onClick={(e) => { e.stopPropagation(); downloadBannerPdf(job.campaigns.banner_url, { plan: job.campaigns?.plans?.name, city: job.campaigns?.city, area: job.campaigns?.area }) }}
+                      disabled={pdfLoading}
+                      style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '8px', padding: '10px 16px', fontSize: '0.84rem', opacity: pdfLoading ? .6 : 1 }}
+                    >
+                      <Download size={14} /> Download Banner (PDF)
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button className="action-btn" onClick={() => handleAcceptJob(job.id)} style={{ ...btn('#1DB954', '#fff'), flex: 1, justifyContent: 'center' }}><CheckCircle size={16} /> Accept Job</button>
                   <button className="action-btn" onClick={() => handleRejectJob(job.id)} style={{ background: '#FDECEA', color: '#C62828', border: '1.5px solid #FFAAAA', borderRadius: '12px', padding: '12px 16px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><XCircle size={15} /> Pass</button>
@@ -384,6 +573,52 @@ export default function DriverDashboard({ profile }) {
               )}
             </div>
             : <div style={card}>
+
+              {/* Added Banner Print Info */}
+              {!todayProof && (() => {
+                const hasPrintReimbursement = earnings?.some(e => e.driver_job_id === activeJob.id && e.type === 'print_reimbursement');
+                if (!hasPrintReimbursement) {
+                  return (
+                    <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #E8E8E8' }}>
+                      <div style={{ background: 'linear-gradient(135deg,#F0FDF4,#E6F9EE)', border: '1.5px solid #A3E4BE', borderRadius: '12px', padding: '14px 16px', marginBottom: '14px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0A6B30', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Printer size={15} /> Print & Earn ₹175 Bonus!
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                          Before you upload your first photo, you must print the banner and put it on your rickshaw. Admin will verify it and add <strong>₹175</strong> to your balance!
+                        </div>
+                      </div>
+                      
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Your Ad Banner</div>
+                      {activeJob.campaigns?.banner_url ? (
+                        <>
+                          <img src={activeJob.campaigns.banner_url} alt="campaign banner" style={{ width: '100%', maxHeight: '100px', objectFit: 'contain', borderRadius: '10px', border: '1px solid #E8E8E8', background: '#fafafa' }} />
+                          <button
+                            className="action-btn"
+                            onClick={() => downloadBannerPdf(activeJob.campaigns.banner_url, {
+                              plan: activeJob.campaigns?.plans?.name,
+                              city: activeJob.campaigns?.city,
+                              area: activeJob.campaigns?.area
+                            })}
+                            disabled={pdfLoading}
+                            style={{ ...btn('#1565C0', '#fff'), width: '100%', justifyContent: 'center', marginTop: '10px', opacity: pdfLoading ? .6 : 1 }}
+                          >
+                            <Download size={16} /> {pdfLoading ? 'Generating PDF…' : 'Download Print-Ready Banner (PDF)'}
+                          </button>
+                        </>
+                      ) : (
+                        <div style={{ background: '#F8F8F8', border: '1px dashed #D8D8D8', borderRadius: '10px', padding: '24px 16px', textAlign: 'center', color: '#888', fontSize: '0.84rem' }}>
+                          <Printer size={24} style={{ marginBottom: '8px', opacity: 0.5 }} />
+                          <div>Banner is being configured.</div>
+                          <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Please check back later or contact admin.</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                return null;
+              })()}
+
               <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}><Camera size={16}/> Today's Photo</div>
               <div style={{ fontSize: '0.87rem', color: '#666', marginBottom: '16px', lineHeight: 1.6 }}>
                 Take a clear photo of the ad banner on your rickshaw.<br />
