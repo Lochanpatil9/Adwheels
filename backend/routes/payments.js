@@ -19,7 +19,7 @@ router.post('/create-order', async (req, res) => {
     return res.status(400).json({ error: 'campaignId and amount are required' })
   }
 
-  try {
+   try {
     const order = await razorpay.orders.create({
       amount: Math.round(amount), // amount in paise, already multiplied by 100 from frontend
       currency,
