@@ -19,6 +19,10 @@ router.post('/create-order', async (req, res) => {
     return res.status(400).json({ error: 'campaignId and amount are required' })
   }
 
+  if (amount <= 0) {
+    return res.status(400).json({ error: 'Amount must be greater than 0' })
+  }
+
    try {
     const order = await razorpay.orders.create({
       amount: Math.round(amount), // amount in paise, already multiplied by 100 from frontend

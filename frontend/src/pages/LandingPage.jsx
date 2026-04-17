@@ -673,7 +673,7 @@ export default function LandingPage({ onGetStarted }) {
             </div>
           </div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{position:'relative',zIndex:1,fontSize:'.78rem',color:'rgba(255,255,255,.25)'}}>© {new Date().getFullYear()} AdWheels. All rights reserved.</div>
+            <div style={{ position: 'relative', zIndex: 1, fontSize: '.78rem', color: 'rgba(255,255,255,.25)' }}>© {new Date().getFullYear()} AdWheels. All rights reserved.</div>
             <div style={{ fontSize: '.82rem', color: 'rgba(255,255,255,.35)' }}>Made with ❤️ for Indore & Bhopal</div>
           </div>
         </div>

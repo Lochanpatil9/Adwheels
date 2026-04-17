@@ -167,7 +167,7 @@ function CampaignExpandedView({ campaign, allDrivers, onAssignDriver, assigningJ
                     })
                   }
                 </select>
-                <button className="action-btn" style={btn('#1DB954', '#fff')} onClick={() => onAssignDriver(campaign.id)}>Assign →</button>
+                <button className="action-btn" disabled={!selectedDriver} style={{ ...btn(!selectedDriver ? '#A3E4BE' : '#1DB954', '#fff'), opacity: !selectedDriver ? 0.5 : 1, cursor: !selectedDriver ? 'not-allowed' : 'pointer' }} onClick={() => onAssignDriver(campaign.id)}>Assign →</button>
                 <button className="action-btn" style={btn('#FDECEA', '#C62828')} onClick={() => { setAssigningJob(null); setSelectedDriver('') }}>Cancel</button>
               </div>
               : <button className="action-btn" style={btn('#F5F5F5', '#555')} onClick={() => setAssigningJob(campaign.id)}><Plus size={13} /> Assign Driver</button>

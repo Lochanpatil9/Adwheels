@@ -166,8 +166,9 @@ function CreateCampaignStepper({ profile, plans, plansLoading, fetchPlans, onDon
               </div>
               <button
                 className="action-btn"
-                onClick={() => { if (!selectedPlan) return toast.error('Pick a plan'); setStep(2) }}
-                style={{ ...btn('#FFBF00', '#111'), width: '100%', justifyContent: 'center', marginTop: '20px' }}
+                disabled={!selectedPlan}
+                onClick={() => setStep(2)}
+                style={{ ...btn(!selectedPlan ? '#E8E8E8' : '#FFBF00', !selectedPlan ? '#bbb' : '#111'), width: '100%', justifyContent: 'center', marginTop: '20px', cursor: !selectedPlan ? 'not-allowed' : 'pointer', opacity: !selectedPlan ? 0.6 : 1 }}
               >
                 Continue <ChevronRight size={16} />
               </button>
@@ -188,7 +189,7 @@ function CreateCampaignStepper({ profile, plans, plansLoading, fetchPlans, onDon
           <input type="text" placeholder="e.g. Vijay Nagar, Subway Franchise…" value={area} onChange={e => setArea(e.target.value)} style={{ width: '100%', padding: '14px 15px', fontSize: '0.95rem', border: '1.5px solid #D8D8D8', borderRadius: '12px', background: '#fff', color: '#111', outline: 'none', fontFamily: 'inherit', marginBottom: '14px' }} />
           <div style={{ display: 'flex', gap: '10px' }}>
             <button className="action-btn" onClick={() => setStep(1)} style={{ ...btn('#F5F5F5', '#666'), flex: 1, justifyContent: 'center' }}>← Back</button>
-            <button className="action-btn" onClick={() => { if (!area) return toast.error('Fill area'); setStep(3) }} style={{ ...btn('#FFBF00', '#111'), flex: 2, justifyContent: 'center' }}>Continue <ChevronRight size={16} /></button>
+            <button className="action-btn" disabled={!area.trim()} onClick={() => setStep(3)} style={{ ...btn(!area.trim() ? '#E8E8E8' : '#FFBF00', !area.trim() ? '#bbb' : '#111'), flex: 2, justifyContent: 'center', cursor: !area.trim() ? 'not-allowed' : 'pointer', opacity: !area.trim() ? 0.6 : 1 }}>Continue <ChevronRight size={16} /></button>
           </div>
         </div>
       )}
@@ -213,7 +214,7 @@ function CreateCampaignStepper({ profile, plans, plansLoading, fetchPlans, onDon
           <input id="bannerInput" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerSelect} />
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button className="action-btn" onClick={() => setStep(2)} style={{ ...btn('#F5F5F5', '#666'), flex: 1, justifyContent: 'center' }}>← Back</button>
-            <button className="action-btn" onClick={() => { if (!bannerFile) return toast.error('Upload banner'); setStep(4) }} style={{ ...btn('#FFBF00', '#111'), flex: 2, justifyContent: 'center' }}>Continue <ChevronRight size={16} /></button>
+            <button className="action-btn" disabled={!bannerFile} onClick={() => setStep(4)} style={{ ...btn(!bannerFile ? '#E8E8E8' : '#FFBF00', !bannerFile ? '#bbb' : '#111'), flex: 2, justifyContent: 'center', cursor: !bannerFile ? 'not-allowed' : 'pointer', opacity: !bannerFile ? 0.6 : 1 }}>Continue <ChevronRight size={16} /></button>
           </div>
         </div>
       )}
@@ -278,10 +279,14 @@ export default function AdvertiserDashboard({ profile }) {
   }
 
   async function handlePayment(campaign) {
+    const planPrice = campaign.plans?.price
+    if (!planPrice || planPrice <= 0) {
+      return toast.error('Invalid plan price. Please contact support.')
+    }
     try {
-      const order = await createRazorpayOrder(campaign.id, campaign.plans?.price || 0)
+      const order = await createRazorpayOrder(campaign.id, planPrice)
       const opts = {
-        key: import.meta.env.VITE_RAZORPAY_KEY,
+        key: order.key || import.meta.env.VITE_RAZORPAY_KEY,
         amount: order.amount, currency: 'INR', order_id: order.orderId,
         name: 'AdWheels', description: `Campaign: ${campaign.plans?.name}`,
         handler: async (response) => {
@@ -295,7 +300,7 @@ export default function AdvertiserDashboard({ profile }) {
         theme: { color: '#FFBF00' }
       }
       new window.Razorpay(opts).open()
-    } catch { toast.error('Payment init failed. Try again.') }
+    } catch (err) { toast.error(err.message || 'Payment init failed. Try again.') }
   }
 
   async function handleCancel(campaignId) {

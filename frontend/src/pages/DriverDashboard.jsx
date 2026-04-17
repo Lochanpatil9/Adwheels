@@ -753,7 +753,7 @@ export default function DriverDashboard({ profile }) {
             <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '16px' }}>Minimum ₹500 · Paid to your UPI in 1-2 days</div>
             <label style={{ display: 'block', fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px', color: '#444' }}>Amount (₹)</label>
             <input type="number" placeholder="Enter amount (min ₹500)" value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} style={inp} />
-            <button className="action-btn" onClick={handleRequestPayout} disabled={payoutLoading} style={{ ...btn('#1DB954', '#fff'), width: '100%', justifyContent: 'center', opacity: payoutLoading ? .6 : 1 }}>
+            <button className="action-btn" onClick={handleRequestPayout} disabled={payoutLoading || !payoutAmount || parseInt(payoutAmount) < 500 || parseInt(payoutAmount) > balance} style={{ ...btn(payoutLoading || !payoutAmount || parseInt(payoutAmount) < 500 || parseInt(payoutAmount) > balance ? '#A3E4BE' : '#1DB954', '#fff'), width: '100%', justifyContent: 'center', opacity: payoutLoading || !payoutAmount || parseInt(payoutAmount) < 500 || parseInt(payoutAmount) > balance ? 0.5 : 1, cursor: payoutLoading || !payoutAmount || parseInt(payoutAmount) < 500 || parseInt(payoutAmount) > balance ? 'not-allowed' : 'pointer' }}>
               {payoutLoading ? 'Requesting...' : <><Wallet size={16} /> Request Payout</>}
             </button>
           </div>

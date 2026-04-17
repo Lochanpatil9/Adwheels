@@ -21,12 +21,17 @@ export async function submitRegistration(data) {
 }
 
 export async function createRazorpayOrder(campaignId, amount) {
+  if (!amount || amount <= 0) throw new Error('Invalid payment amount')
+  const amountInPaise = Math.round(amount * 100)
   const res = await fetch(`${API_BASE}/api/payments/create-order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ campaignId, amount, currency: 'INR' }),
+    body: JSON.stringify({ campaignId, amount: amountInPaise, currency: 'INR' }),
   })
-  if (!res.ok) throw new Error('Failed to create order')
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to create order')
+  }
   return res.json()
 }
 
