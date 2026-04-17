@@ -1,5 +1,7 @@
 import express from 'express'
 import cors from 'cors'
+
+// Import route handlers from backend
 import healthRouter from '../backend/routes/health.js'
 import leadsRouter from '../backend/routes/leads.js'
 import paymentsRouter from '../backend/routes/payments.js'
@@ -22,4 +24,5 @@ app.use('/api/campaigns', campaignsRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/drivers', driversRouter)
 
+// Vercel serverless handler
 export default app
