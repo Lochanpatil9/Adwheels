@@ -24,6 +24,11 @@ router.post('/create-order', async (req, res) => {
   }
 
    try {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Missing Razorpay credentials — RAZORPAY_KEY_ID:', !!process.env.RAZORPAY_KEY_ID, 'RAZORPAY_KEY_SECRET:', !!process.env.RAZORPAY_KEY_SECRET)
+      return res.status(500).json({ error: 'Payment gateway not configured. Contact support.' })
+    }
+
     const order = await razorpay.orders.create({
       amount: Math.round(amount), // amount in paise, already multiplied by 100 from frontend
       currency,
@@ -37,7 +42,8 @@ router.post('/create-order', async (req, res) => {
       key: process.env.RAZORPAY_KEY_ID,
     })
   } catch (err) {
-    console.error('Razorpay order creation error:', err)
+    console.error('Razorpay order creation error:', err.message || err)
+    console.error('ENV check — RAZORPAY_KEY_ID present:', !!process.env.RAZORPAY_KEY_ID, 'RAZORPAY_KEY_SECRET present:', !!process.env.RAZORPAY_KEY_SECRET)
     res.status(500).json({ error: 'Failed to create payment order' })
   }
 })
