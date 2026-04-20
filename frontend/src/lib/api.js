@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || ''
+const API_BASE = ''
 
 export async function submitEnterpriseLead(data) {
   const res = await fetch(`${API_BASE}/api/leads/enterprise`, {
@@ -70,7 +70,7 @@ export async function triggerExpiryCheck() {
 }
 
 export async function sendNotification({ userId, type, title, message }) {
-  const res = await fetch(`${API_BASE}/api/notifications`, {
+  const res = await fetch(`${API_BASE}/api/notifications/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, type, title, message }),
@@ -97,4 +97,3 @@ export async function autoAssignAll() {
   if (!res.ok) throw new Error('Failed to bulk auto-assign')
   return res.json()
 }
-
