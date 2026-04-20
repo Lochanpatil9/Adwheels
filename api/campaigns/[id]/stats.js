@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       pendingProofs = (proofs || []).filter(proof => proof.status === 'pending').length
     }
 
-    const MS_PER_DAY = 86400000
+    const MS_PER_DAY = 24 * 60 * 60 * 1000
     const CAMPAIGN_DURATION_DAYS = 30
     const activatedAt = campaign.activated_at ? new Date(campaign.activated_at) : null
     const daysActive = activatedAt ? Math.floor((Date.now() - activatedAt.getTime()) / MS_PER_DAY) : 0
