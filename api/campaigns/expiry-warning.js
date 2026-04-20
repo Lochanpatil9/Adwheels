@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const fiveDaysFromNow = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString()
+    const twentyFiveDaysAgo = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString()
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
     const { data: expiring } = await supabase
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       .select('id, advertiser_id, company_name, city')
       .eq('status', 'active')
       .not('activated_at', 'is', null)
-      .lt('activated_at', fiveDaysFromNow)
+      .lt('activated_at', twentyFiveDaysAgo)
       .gt('activated_at', thirtyDaysAgo)
 
     if (!expiring || expiring.length === 0) {
