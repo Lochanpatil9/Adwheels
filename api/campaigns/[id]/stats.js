@@ -6,9 +6,10 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'https://adwheels.in')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Credentials', true)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
@@ -22,63 +23,54 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: campaign, error: campErr } = await supabase
+    const { data: campaign, error: campaignError } = await supabase
       .from('campaigns')
-      .select('id, status, created_at, activated_at')
+      .select('activated_at')
       .eq('id', id)
       .single()
 
-    if (campErr || !campaign) {
+    if (campaignError || !campaign) {
       return res.status(404).json({ error: 'Campaign not found' })
     }
 
-    const { data: jobs, error: jobErr } = await supabase
+    const { data: jobs, error: jobsError } = await supabase
       .from('driver_jobs')
-      .select('id, status, driver_id')
+      .select('id, status')
       .eq('campaign_id', id)
-      .neq('status', 'rejected')
 
-    if (jobErr) throw jobErr
+    if (jobsError) throw jobsError
 
-    const jobIds = (jobs || []).map(j => j.id)
-    let totalProofs = 0
+    const jobIds = (jobs || []).map(job => job.id)
     let approvedProofs = 0
     let pendingProofs = 0
 
     if (jobIds.length > 0) {
-      const { data: proofs, error: proofErr } = await supabase
+      const { data: proofs, error: proofsError } = await supabase
         .from('daily_proofs')
         .select('status')
         .in('driver_job_id', jobIds)
 
-      if (!proofErr && proofs) {
-        totalProofs = proofs.length
-        approvedProofs = proofs.filter(p => p.status === 'approved').length
-        pendingProofs = proofs.filter(p => p.status === 'pending').length
-      }
+      if (proofsError) throw proofsError
+
+      approvedProofs = (proofs || []).filter(proof => proof.status === 'approved').length
+      pendingProofs = (proofs || []).filter(proof => proof.status === 'pending').length
     }
 
     const activatedAt = campaign.activated_at ? new Date(campaign.activated_at) : null
-    const now = new Date()
-    const daysActive = activatedAt ? Math.floor((now - activatedAt) / 86400000) : 0
+    const daysActive = activatedAt ? Math.floor((Date.now() - activatedAt.getTime()) / 86400000) : 0
     const daysRemaining = activatedAt ? Math.max(0, 30 - daysActive) : 30
-    const activeDrivers = (jobs || []).filter(j => j.status === 'active').length
     const totalDrivers = (jobs || []).length
+    const activeDrivers = (jobs || []).filter(job => job.status === 'active').length
 
     res.json({
-      campaignId: id,
-      status: campaign.status,
-      activatedAt: campaign.activated_at,
       daysActive,
       daysRemaining,
       totalDrivers,
       activeDrivers,
-      totalProofs,
       approvedProofs,
       pendingProofs,
     })
-  } catch (err) {
-    console.error('Campaign stats error:', err)
+  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch stats' })
   }
 }

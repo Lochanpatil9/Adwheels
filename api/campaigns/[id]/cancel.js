@@ -6,9 +6,10 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'https://adwheels.in')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Credentials', true)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
@@ -22,30 +23,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: campaign, error: fetchErr } = await supabase
+    const { data: campaign, error: fetchError } = await supabase
       .from('campaigns')
-      .select('id, status')
+      .select('status')
       .eq('id', id)
       .single()
 
-    if (fetchErr || !campaign) {
+    if (fetchError || !campaign) {
       return res.status(404).json({ error: 'Campaign not found' })
     }
 
     if (campaign.status !== 'pending') {
-      return res.status(400).json({ error: `Cannot cancel a campaign with status "${campaign.status}". Only pending campaigns can be cancelled.` })
+      return res.status(400).json({ error: 'Only pending campaigns can be cancelled' })
     }
 
-    const { error: updateErr } = await supabase
+    const { error: updateError } = await supabase
       .from('campaigns')
       .update({ status: 'cancelled' })
       .eq('id', id)
 
-    if (updateErr) throw updateErr
+    if (updateError) throw updateError
 
-    res.json({ success: true, message: 'Campaign cancelled' })
-  } catch (err) {
-    console.error('Cancel campaign error:', err)
+    res.json({ success: true })
+  } catch (error) {
     res.status(500).json({ error: 'Failed to cancel campaign' })
   }
 }

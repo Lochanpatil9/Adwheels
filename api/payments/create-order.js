@@ -6,38 +6,30 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-})
-
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'https://adwheels.in')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Credentials', true)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { campaignId, amount, currency = 'INR' } = req.body || {}
+  const { campaignId, amount, currency } = req.body || {}
 
   if (!campaignId || !amount) {
     return res.status(400).json({ error: 'campaignId and amount are required' })
   }
 
-  if (amount <= 0) {
-    return res.status(400).json({ error: 'Amount must be greater than 0' })
-  }
-
   try {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.error('Missing Razorpay credentials — RAZORPAY_KEY_ID:', !!process.env.RAZORPAY_KEY_ID, 'RAZORPAY_KEY_SECRET:', !!process.env.RAZORPAY_KEY_SECRET)
-      return res.status(500).json({ error: 'Payment gateway not configured. Contact support.' })
-    }
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
 
     const order = await razorpay.orders.create({
-      amount: Math.round(amount),
+      amount,
       currency,
       receipt: campaignId.replace(/-/g, '').substring(0, 40),
     })
@@ -48,9 +40,7 @@ export default async function handler(req, res) {
       currency: order.currency,
       key: process.env.RAZORPAY_KEY_ID,
     })
-  } catch (err) {
-    console.error('Razorpay order creation error:', err.message || err)
-    console.error('ENV check — RAZORPAY_KEY_ID present:', !!process.env.RAZORPAY_KEY_ID, 'RAZORPAY_KEY_SECRET present:', !!process.env.RAZORPAY_KEY_SECRET)
+  } catch (error) {
     res.status(500).json({ error: 'Failed to create payment order' })
   }
 }

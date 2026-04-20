@@ -6,9 +6,10 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'https://adwheels.in')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Credentials', true)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
@@ -17,24 +18,19 @@ export default async function handler(req, res) {
   const { name, phone, city, role, business, budget, area } = req.body || {}
 
   if (!name || !phone || !city) {
-    return res.status(400).json({ error: 'Name, phone, and city are required' })
+    return res.status(400).json({ error: 'name, phone, and city are required' })
   }
 
   const { error } = await supabase.from('enterprise_leads').insert({
     full_name: name,
     phone,
-    company_name: business || `${role || 'general'} registration`,
+    company_name: business || `${role} registration`,
     city,
-    message: [
-      role && `Role: ${role}`,
-      budget && `Budget: ${budget}`,
-      area && `Area: ${area}`,
-    ].filter(Boolean).join(' | '),
+    message: [role, budget, area].filter(Boolean).join(' | '),
     status: 'new',
   })
 
   if (error) {
-    console.error('Registration insert error:', error)
     return res.status(500).json({ error: 'Failed to register' })
   }
 

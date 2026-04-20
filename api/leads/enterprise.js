@@ -6,9 +6,10 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'https://adwheels.in')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Credentials', true)
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
   const { company, name, phone, email, city, message } = req.body || {}
 
   if (!company || !name || !phone) {
-    return res.status(400).json({ error: 'Company name, your name, and phone are required' })
+    return res.status(400).json({ error: 'company, name, and phone are required' })
   }
 
   const { error } = await supabase.from('enterprise_leads').insert({
@@ -30,7 +31,6 @@ export default async function handler(req, res) {
   })
 
   if (error) {
-    console.error('Enterprise lead insert error:', error)
     return res.status(500).json({ error: 'Failed to submit lead' })
   }
 
