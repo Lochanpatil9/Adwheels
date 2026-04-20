@@ -9,3 +9,7 @@ public/
 .claude/
 CLAUDE.md
 fix_colors.js
+.env.example
+backend/.env
+frontend/.env
+*.env
