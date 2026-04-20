@@ -15,7 +15,9 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const CAMPAIGN_DURATION_DAYS = 30
+  const MS_PER_DAY = 24 * 60 * 60 * 1000
+  const cutoff = new Date(Date.now() - CAMPAIGN_DURATION_DAYS * MS_PER_DAY).toISOString()
 
   try {
     const { data: expiredCampaigns, error: fetchError } = await supabase
