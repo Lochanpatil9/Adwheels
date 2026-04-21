@@ -1,4 +1,13 @@
 {
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "@vercel/node@3.0.0"
+    }
+  },
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }
