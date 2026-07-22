@@ -6,6 +6,8 @@ node_modules/
 dist/
 public/
 *.log
+.gemini/
+.agents/
 .claude/
 CLAUDE.md
 fix_colors.js
