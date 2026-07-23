@@ -34,17 +34,53 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
+    // First, try to find profile by auth user ID
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
       .single()
 
-    if (error && error.code !== 'PGRST116') {
+    if (data) {
+      setProfile(data)
+      setLoading(false)
+      return
+    }
+
+    // If not found by ID (e.g. Google OAuth new auth user), try by email
+    if (error && (error.code === 'PGRST116' || error.message?.includes('recursion'))) {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const email = authUser?.email
+      
+      if (email) {
+        // Look up existing profile by email
+        const { data: emailProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single()
+
+        if (emailProfile) {
+          // Found existing profile — update its ID to the new Google auth user ID
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ id: userId })
+            .eq('email', email)
+          
+          if (!updateError) {
+            setProfile({ ...emailProfile, id: userId })
+            setLoading(false)
+            return
+          }
+        }
+      }
+    }
+
+    if (error && error.code !== 'PGRST116' && !error.message?.includes('recursion')) {
       console.error('Failed to fetch profile:', error)
       toast.error('Failed to load profile. Please try again.')
     }
-    setProfile(data || null)
+    setProfile(null)
     setLoading(false)
   }
 
