@@ -46,7 +46,28 @@ export function AuthProvider({ children }) {
       return
     }
 
-    // PGRST116 = no rows found (new user, needs setup)
+    // No profile found — try auto-linking by email (for Google OAuth users)
+    if (error && (error.code === 'PGRST116' || error.message?.includes('recursion'))) {
+      const { data: linkResult } = await supabase.rpc('link_profile_by_email', {
+        current_user_id: userId
+      })
+
+      if (linkResult?.linked) {
+        // Profile was linked — re-fetch it
+        const { data: linkedProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (linkedProfile) {
+          setProfile(linkedProfile)
+          setLoading(false)
+          return
+        }
+      }
+    }
+
     if (error && error.code !== 'PGRST116' && !error.message?.includes('recursion')) {
       console.error('Failed to fetch profile:', error)
       toast.error('Failed to load profile. Please try again.')
