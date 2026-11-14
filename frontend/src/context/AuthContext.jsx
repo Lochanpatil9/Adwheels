@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
+      if (session?.user) fetchProfile(session.user)
       else setLoading(false)
     })
 
@@ -26,52 +26,55 @@ export function AuthProvider({ children }) {
       }
       setIsPasswordReset(false)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
+      if (session?.user) fetchProfile(session.user)
       else { setProfile(null); setLoading(false) }
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  async function fetchProfile(userId) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (data) {
-      setProfile(data)
-      setLoading(false)
-      return
-    }
-
-    // No profile found — try auto-linking by email (for Google OAuth users)
-    if (error && (error.code === 'PGRST116' || error.message?.includes('recursion'))) {
-      const { data: linkResult } = await supabase.rpc('link_profile_by_email', {
-        current_user_id: userId
-      })
-
-      if (linkResult?.linked) {
-        // Profile was linked — re-fetch it
-        const { data: linkedProfile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single()
-
-        if (linkedProfile) {
-          setProfile(linkedProfile)
-          setLoading(false)
-          return
-        }
+  async function fetchProfile(authUser) {
+    // Always fetch via backend API (bypasses RLS, handles linking)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        setProfile(null)
+        setLoading(false)
+        return
       }
+
+      // Step 1: Try fetching profile from backend (bypasses RLS)
+      const profileRes = await fetch('/api/auth/profile', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      })
+      const profileData = await profileRes.json()
+
+      if (profileData.profile) {
+        setProfile(profileData.profile)
+        setLoading(false)
+        return
+      }
+
+      // Step 2: No profile — try auto-linking by email (Google OAuth)
+      const linkRes = await fetch('/api/auth/link-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      const linkData = await linkRes.json()
+
+      if (linkData.profile) {
+        setProfile(linkData.profile)
+        setLoading(false)
+        return
+      }
+    } catch (e) {
+      console.error('Profile fetch error:', e)
     }
 
-    if (error && error.code !== 'PGRST116' && !error.message?.includes('recursion')) {
-      console.error('Failed to fetch profile:', error)
-      toast.error('Failed to load profile. Please try again.')
-    }
+    // No profile found anywhere — new user needs setup
     setProfile(null)
     setLoading(false)
   }

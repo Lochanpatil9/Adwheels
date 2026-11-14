@@ -302,7 +302,7 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
         <div style={{position:'absolute',bottom:'-60px',left:'-60px',width:'300px',height:'300px',background:'radial-gradient(circle,rgba(124,58,237,.15) 0%,transparent 65%)',pointerEvents:'none'}}/>
 
         <div style={{position:'relative',zIndex:1}}>
-          <div style={{fontFamily:'Bebas Neue',fontSize:'2.2rem',color:'#FFBF00',letterSpacing:'.06em',marginBottom:'4px'}}>AdWheels</div>
+          <div onClick={() => window.location.href = '/'} style={{fontFamily:'Bebas Neue',fontSize:'2.2rem',color:'#FFBF00',letterSpacing:'.06em',marginBottom:'4px',cursor:'pointer'}}>AdWheels</div>
           <div style={{fontSize:'.83rem',color:'rgba(255,255,255,.45)'}}>Your ad on roads in 90 minutes</div>
         </div>
 
@@ -466,8 +466,8 @@ export default function AuthPage({ setupMode = false, userId = null } = {}) {
               <label style={LBL}><Phone size={12} style={{display:'inline',marginRight:'4px',verticalAlign:'middle'}}/> Mobile Number</label>
               <input style={INP} className="auth-inp" type="tel" placeholder="e.g. 98765 43210" value={form.phone} onChange={e=>up('phone',e.target.value)}/>
 
-              <label style={LBL}><Mail size={12} style={{display:'inline',marginRight:'4px',verticalAlign:'middle'}}/> Email Address</label>
-              <input style={INP} className="auth-inp" type="email" placeholder="e.g. rahul@email.com" value={form.email} onChange={e=>up('email',e.target.value)}/>
+              <label style={LBL}><Mail size={12} style={{display:'inline',marginRight:'4px',verticalAlign:'middle'}}/> Email Address {setupMode && form.email && <span style={{color:'#10B981',fontWeight:600,textTransform:'none',letterSpacing:0}}> ✓ from Google</span>}</label>
+              <input style={{...INP, ...(setupMode && form.email ? {background:'#F8FAFC',color:'#64748B',cursor:'not-allowed'} : {})}} className="auth-inp" type="email" placeholder="e.g. rahul@email.com" value={form.email} onChange={e=>up('email',e.target.value)} readOnly={setupMode && !!form.email}/>
 
               <label style={LBL}><Calendar size={12} style={{display:'inline',marginRight:'4px',verticalAlign:'middle'}}/> Date of Birth</label>
               <input style={INP} className="auth-inp" type="date" value={form.dob} onChange={e=>up('dob',e.target.value)}/>

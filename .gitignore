@@ -16,3 +16,5 @@ backend/.env
 frontend/.env
 *.env
 .vercel
+frontend/src/pages/*backup*.jsx
+frontend/src/pages/*.html

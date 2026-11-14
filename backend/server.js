@@ -7,6 +7,7 @@ import paymentsRouter from './routes/payments.js'
 import campaignsRouter from './routes/campaigns.js'
 import notificationsRouter from './routes/notifications.js'
 import driversRouter from './routes/drivers.js'
+import authRouter from './routes/auth.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -23,6 +24,7 @@ app.use('/api/payments', paymentsRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/drivers', driversRouter)
+app.use('/api/auth', authRouter)
 
 // Auto-expire campaigns: check on startup + every 24 hours
 async function runExpiryCheck() {

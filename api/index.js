@@ -23,6 +23,7 @@ import paymentsRouter from '../backend/routes/payments.js'
 import campaignsRouter from '../backend/routes/campaigns.js'
 import notificationsRouter from '../backend/routes/notifications.js'
 import driversRouter from '../backend/routes/drivers.js'
+import authRouter from '../backend/routes/auth.js'
 
 app.use('/api/health', healthRouter)
 app.use('/api/leads', leadsRouter)
@@ -30,5 +31,6 @@ app.use('/api/payments', paymentsRouter)
 app.use('/api/campaigns', campaignsRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/drivers', driversRouter)
+app.use('/api/auth', authRouter)
 
 export default app

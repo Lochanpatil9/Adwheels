@@ -288,7 +288,7 @@ export default function DriverDashboard({ profile }) {
 
       {/* NAV */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', padding: '0 18px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: '#FFBF00', letterSpacing: '0.05em' }}>AdWheels</div>
+        <div onClick={() => window.location.href = '/'} style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: '#FFBF00', letterSpacing: '0.05em', cursor: 'pointer' }}>AdWheels</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button onClick={handleRefresh} style={{ background: 'none', border: '1.5px solid #E8E8E8', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888' }} title="Refresh data">
             <RefreshCw size={14} className={refreshing ? 'refresh-spin' : ''} />

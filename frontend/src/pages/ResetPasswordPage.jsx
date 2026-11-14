@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
       <div style={{ width: '100%', maxWidth: '420px', background: '#fff', borderRadius: '24px', padding: '40px 36px', boxShadow: '0 8px 40px rgba(0,0,0,.08)', border: '1px solid #F1F5F9' }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-          <div style={{ fontFamily: 'Bebas Neue', fontSize: '2.2rem', color: '#FFBF00', letterSpacing: '.06em' }}>AdWheels</div>
+          <div onClick={() => window.location.href = '/'} style={{ fontFamily: 'Bebas Neue', fontSize: '2.2rem', color: '#FFBF00', letterSpacing: '.06em', cursor: 'pointer' }}>AdWheels</div>
         </div>
 
         {done ? (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { submitEnterpriseLead, submitRegistration } from '../lib/api'
+import RickshawHero from '../components/RickshawHero'
 
 /* ── scroll reveal ── */
 function useReveal() {
@@ -103,7 +104,7 @@ export default function LandingPage({ onGetStarted }) {
   }
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", background: '#FFFFFF', color: '#0F172A', overflowX: 'hidden' }}>
+    <div style={{ fontFamily: "'DM Sans',sans-serif", background: '#FFFFFF', color: '#0F172A', overflowX: 'clip' }}>
       <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
       *{box-sizing:border-box;margin:0;padding:0}
@@ -195,26 +196,39 @@ export default function LandingPage({ onGetStarted }) {
     `}</style>
 
       {/* ═══════════════════════════ NAV ═══════════════════════════ */}
-      <nav className={`lp-nav${scrolled ? ' stuck' : ''}`} style={{ position: 'sticky', top: 0, zIndex: 100, background: scrolled ? 'rgba(255,255,255,.98)' : '#fff', borderBottom: '1px solid #F1F5F9', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '62px' }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: '1.9rem', color: '#FFBF00', letterSpacing: '.06em', cursor: 'pointer' }} onClick={() => scrollTo('hero')}>AdWheels</div>
+      <nav className={`lp-nav${scrolled ? ' stuck' : ''}`} style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        background: scrolled ? 'rgba(255,255,255,.98)' : 'rgba(15,23,42,0.88)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: scrolled ? '1px solid #F1F5F9' : '1px solid rgba(255,255,255,0.1)',
+        padding: '0 32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        height: '62px',
+        transition: 'all .3s ease'
+      }}>
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: '1.9rem', color: '#FFBF00', letterSpacing: '.06em', cursor: 'pointer' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>AdWheels</div>
 
         <div className="hide-mob" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
           {[['How It Works', 'how'], ['Pricing', 'pricing'], ['Enterprise', 'enterprise'], ['For Drivers', 'register']].map(([l, id]) => (
-            <button key={id} className="btn-ghost" onClick={() => scrollTo(id)}>{l}</button>
+            <button key={id} className="btn-ghost" onClick={() => scrollTo(id)} style={{ color: scrolled ? '#374151' : '#F1F5F9' }}>{l}</button>
           ))}
         </div>
 
         <div className="hide-mob" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={onGetStarted} style={{ background: 'none', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '9px 18px', fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', color: '#374151', fontFamily: 'DM Sans,sans-serif', transition: 'all .2s' }}
-            onMouseEnter={e => { e.target.style.borderColor = '#0F172A'; e.target.style.color = '#0F172A' }}
-            onMouseLeave={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.color = '#374151' }}>
+          <button onClick={onGetStarted} style={{ background: 'none', border: scrolled ? '1.5px solid #E2E8F0' : '1.5px solid rgba(255,255,255,0.3)', borderRadius: '10px', padding: '9px 18px', fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', color: scrolled ? '#374151' : '#F8FAFC', fontFamily: 'DM Sans,sans-serif', transition: 'all .2s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#FFBF00'; e.currentTarget.style.color = '#FFBF00' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = scrolled ? '#E2E8F0' : 'rgba(255,255,255,0.3)'; e.currentTarget.style.color = scrolled ? '#374151' : '#F8FAFC' }}>
             Login
           </button>
           <button className="btn-pri" style={{ padding: '9px 20px', fontSize: '.88rem' }} onClick={onGetStarted}>Get Started Free →</button>
         </div>
 
         <button className="show-mob" onClick={() => setMobileOpen(o => !o)}
-          style={{ background: 'none', border: '1.5px solid #E2E8F0', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', color: '#374151', fontSize: '1.1rem' }}>
+          style={{ background: 'none', border: scrolled ? '1.5px solid #E2E8F0' : '1.5px solid rgba(255,255,255,0.3)', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', color: scrolled ? '#374151' : '#fff', fontSize: '1.1rem' }}>
           {mobileOpen ? '✕' : '☰'}
         </button>
       </nav>
@@ -227,102 +241,8 @@ export default function LandingPage({ onGetStarted }) {
         <button className="btn-pri" style={{ marginTop: '10px', width: '100%', justifyContent: 'center' }} onClick={() => { setMobileOpen(false); onGetStarted() }}>Get Started Free →</button>
       </div>
 
-      {/* ═══════════════════════════ HERO ═══════════════════════════ */}
-      <div id="hero" style={{ background: '#FFFFFF', position: 'relative', overflow: 'hidden' }}>
-        {/* Background decoration */}
-        <div style={{ position: 'absolute', top: '-80px', right: '-120px', width: '600px', height: '600px', background: 'radial-gradient(circle,rgba(255,191,0,.12) 0%,transparent 65%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-40px', left: '-80px', width: '400px', height: '400px', background: 'radial-gradient(circle,rgba(255,140,0,.07) 0%,transparent 65%)', pointerEvents: 'none' }} />
-
-        <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '90px 32px 80px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center' }} className="two-col">
-
-          {/* Left — Change 4: sequenced hero entrance */}
-          <div>
-            {/* Pill badge */}
-            <div className="hero-seq hero-seq-0" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '100px', padding: '7px 16px', fontSize: '.8rem', fontWeight: 700, color: '#92400E', marginBottom: '28px', letterSpacing: '.02em' }}>
-              <span style={{ width: '7px', height: '7px', background: '#F59E0B', borderRadius: '50%', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-              🛺 Live in Indore & Bhopal
-            </div>
-            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
-
-            <h1 className="hero-seq hero-seq-1" style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 'clamp(2.4rem,5vw,3.8rem)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-.03em', marginBottom: '22px', color: '#0F172A' }}>
-              Get Your Ad on<br />
-              <span className="grad-text">1000+ Rickshaws</span><br />
-              in 90 Minutes
-            </h1>
-
-            <p className="hero-seq hero-seq-2" style={{ fontSize: '1.08rem', color: '#64748B', lineHeight: 1.7, marginBottom: '36px', maxWidth: '440px' }}>
-              The fastest, most affordable way to advertise in Indore & Bhopal. No agencies. No waiting. Just upload, assign, and go live.
-            </p>
-
-            <div className="hero-seq hero-seq-3" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '40px' }}>
-              <button className="btn-pri" onClick={onGetStarted}>Launch My Ad Now →</button>
-              <button className="btn-sec" onClick={() => scrollTo('how')}>See How It Works</button>
-            </div>
-
-            {/* Trust row */}
-            <div className="hero-seq hero-seq-4" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {['✅ Verified Drivers', '📸 Daily Photo Proof', '💰 From ₹1,500/mo'].map(t => (
-                <span key={t} className="trust-badge">{t}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* Right — visual card */}
-          <div style={{ position: 'relative' }}>
-            {/* Main card */}
-            <div style={{ background: 'linear-gradient(135deg,#0F172A 0%,#1E293B 100%)', borderRadius: '24px', padding: '32px', boxShadow: '0 24px 60px rgba(15,23,42,.25)', color: '#fff', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '160px', height: '160px', background: 'radial-gradient(circle,rgba(255,191,0,.2),transparent)', borderRadius: '50%' }} />
-              {/* Mock campaign card */}
-              <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '16px', padding: '20px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                  <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg,#FFBF00,#FF8C00)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>🛺</div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '.95rem' }}>Growth Campaign</div>
-                    <div style={{ fontSize: '.78rem', color: 'rgba(255,255,255,.5)', marginTop: '2px' }}>Vijay Nagar, Indore</div>
-                  </div>
-                  <div style={{ marginLeft: 'auto', background: 'rgba(16,185,129,.15)', border: '1px solid rgba(16,185,129,.3)', borderRadius: '100px', padding: '4px 12px', fontSize: '.72rem', fontWeight: 800, color: '#34D399', letterSpacing: '.06em', textTransform: 'uppercase' }}>Live</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                  {[['7', 'Rickshaws'], ['₹11K', 'Monthly'], ['90m', 'Go Live']].map(([n, l]) => (
-                    <div key={l} style={{ background: 'rgba(255,255,255,.05)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                      <div style={{ fontFamily: 'Bebas Neue', fontSize: '1.5rem', color: '#FFBF00', lineHeight: 1 }}>{n}</div>
-                      <div style={{ fontSize: '.65rem', color: 'rgba(255,255,255,.45)', textTransform: 'uppercase', letterSpacing: '.05em', marginTop: '3px', fontWeight: 700 }}>{l}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div style={{ marginBottom: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.78rem', color: 'rgba(255,255,255,.5)', marginBottom: '6px' }}>
-                  <span>Campaign Progress</span><span>Day 14 of 30</span>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,.1)', borderRadius: '100px', height: '6px', overflow: 'hidden' }}>
-                  <div style={{ width: '47%', height: '100%', background: 'linear-gradient(90deg,#FFBF00,#FF8C00)', borderRadius: '100px' }} />
-                </div>
-              </div>
-
-              {/* Activity dots */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '.8rem', color: 'rgba(255,255,255,.5)' }}>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {[1, 2, 3, 4, 5].map(i => <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i <= 4 ? '#10B981' : 'rgba(255,255,255,.15)' }} />)}
-                </div>
-                <span>4 drivers active today</span>
-              </div>
-            </div>
-
-            {/* Floating stat bubbles */}
-            <div style={{ position: 'absolute', top: '-18px', left: '-18px', background: '#fff', border: '1px solid #F1F5F9', borderRadius: '14px', padding: '12px 16px', boxShadow: '0 8px 24px rgba(0,0,0,.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '1.4rem' }}>📸</span>
-              <div><div style={{ fontWeight: 800, fontSize: '.9rem', color: '#0F172A' }}>Daily Proof</div><div style={{ fontSize: '.75rem', color: '#64748B' }}>Photo uploaded ✅</div></div>
-            </div>
-            <div style={{ position: 'absolute', bottom: '-16px', right: '-16px', background: '#fff', border: '1px solid #F1F5F9', borderRadius: '14px', padding: '12px 16px', boxShadow: '0 8px 24px rgba(0,0,0,.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '1.4rem' }}>💰</span>
-              <div><div style={{ fontWeight: 800, fontSize: '.9rem', color: '#0F172A' }}>₹175 Credited</div><div style={{ fontSize: '.75rem', color: '#64748B' }}>Driver payout</div></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* ═══════════════════════════ SCROLLING RICKSHAW HERO ═══════════════════════════ */}
+      <RickshawHero onGetStarted={onGetStarted} onExplore={() => scrollTo('how')} />
 
       {/* ── Social proof ticker ── */}
       <div style={{ background: '#FFFBEB', borderTop: '1px solid #FDE68A', borderBottom: '1px solid #FDE68A', padding: '12px 0', overflow: 'hidden' }}>

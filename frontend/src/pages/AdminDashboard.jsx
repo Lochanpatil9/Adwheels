@@ -524,7 +524,7 @@ export default function AdminDashboard({ profile }) {
       {/* NAV */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB', padding: '0 18px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: '#FFBF00', letterSpacing: '0.05em' }}>AdWheels</div>
+          <div onClick={() => window.location.href = '/'} style={{ fontFamily: 'Bebas Neue,sans-serif', fontSize: '1.7rem', color: '#FFBF00', letterSpacing: '0.05em', cursor: 'pointer' }}>AdWheels</div>
           <span style={{ background: '#FDECEA', color: '#C62828', border: '1px solid #FFAAAA', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 9px', borderRadius: '100px' }}>Admin</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
