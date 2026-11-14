@@ -476,7 +476,7 @@ export default function RickshawHero({ onGetStarted, onExplore }) {
   return (
     <section className="pin" id="ride" ref={pinRef} style={{ height: '1400vh', position: 'relative' }}>
       <style>{`
-        .stick { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #0F172A; }
+        .stick { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow: hidden; background: #0F172A; width: 100%; }
         #w { position: absolute; inset: 0; width: 100%; height: 100%; }
         #rk { position: absolute; transform-origin: 50% 100%; will-change: transform; isolation: isolate; }
         #rk img { filter: drop-shadow(0 8px 18px rgba(0,0,0,.6)); display: block; width: 100%; height: auto; }
@@ -496,7 +496,7 @@ export default function RickshawHero({ onGetStarted, onExplore }) {
         .intro-hero {
           position: absolute;
           left: 50%;
-          top: 3.5vh;
+          top: max(68px, 9vh);
           transform: translateX(-50%);
           z-index: 5;
           text-align: center;
@@ -531,15 +531,18 @@ export default function RickshawHero({ onGetStarted, onExplore }) {
           background: rgba(255, 255, 255, 0.2);
         }
         @media (max-width: 640px) {
-          .intro-hero { top: 2vh; width: 94%; }
+          .intro-hero { top: max(64px, 8vh); width: 94%; }
           .trust-strip {
-            gap: 12px;
-            padding: 8px 16px;
-            font-size: 0.78rem;
+            gap: 10px;
+            padding: 7px 14px;
+            font-size: 0.75rem;
           }
           .trust-strip-item span {
-            font-size: 0.75rem !important;
+            font-size: 0.72rem !important;
           }
+        }
+        @media (max-width: 768px) {
+          .cue { display: none !important; }
         }
 
         /* Animated Scroll Indicator */

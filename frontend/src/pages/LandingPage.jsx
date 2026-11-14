@@ -197,13 +197,16 @@ export default function LandingPage({ onGetStarted }) {
 
       {/* ═══════════════════════════ NAV ═══════════════════════════ */}
       <nav className={`lp-nav${scrolled ? ' stuck' : ''}`} style={{
-        position: 'sticky',
+        position: 'fixed',
         top: 0,
+        left: 0,
+        right: 0,
         zIndex: 100,
-        background: scrolled ? 'rgba(255,255,255,.98)' : 'rgba(15,23,42,0.88)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: scrolled ? '1px solid #F1F5F9' : '1px solid rgba(255,255,255,0.1)',
-        padding: '0 32px',
+        background: scrolled ? 'rgba(255,255,255,.98)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(12px)' : 'none',
+        WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
+        borderBottom: scrolled ? '1px solid #F1F5F9' : 'none',
+        padding: '0 24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -214,12 +217,12 @@ export default function LandingPage({ onGetStarted }) {
 
         <div className="hide-mob" style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
           {[['How It Works', 'how'], ['Pricing', 'pricing'], ['Enterprise', 'enterprise'], ['For Drivers', 'register']].map(([l, id]) => (
-            <button key={id} className="btn-ghost" onClick={() => scrollTo(id)} style={{ color: scrolled ? '#374151' : '#F1F5F9' }}>{l}</button>
+            <button key={id} className="btn-ghost" onClick={() => scrollTo(id)} style={{ color: scrolled ? '#374151' : '#F1F5F9', textShadow: scrolled ? 'none' : '0 1px 4px rgba(0,0,0,0.6)' }}>{l}</button>
           ))}
         </div>
 
         <div className="hide-mob" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={onGetStarted} style={{ background: 'none', border: scrolled ? '1.5px solid #E2E8F0' : '1.5px solid rgba(255,255,255,0.3)', borderRadius: '10px', padding: '9px 18px', fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', color: scrolled ? '#374151' : '#F8FAFC', fontFamily: 'DM Sans,sans-serif', transition: 'all .2s' }}
+          <button onClick={onGetStarted} style={{ background: scrolled ? 'none' : 'rgba(15,23,42,0.6)', border: scrolled ? '1.5px solid #E2E8F0' : '1.5px solid rgba(255,255,255,0.3)', borderRadius: '10px', padding: '9px 18px', fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', color: scrolled ? '#374151' : '#F8FAFC', fontFamily: 'DM Sans,sans-serif', transition: 'all .2s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = '#FFBF00'; e.currentTarget.style.color = '#FFBF00' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = scrolled ? '#E2E8F0' : 'rgba(255,255,255,0.3)'; e.currentTarget.style.color = scrolled ? '#374151' : '#F8FAFC' }}>
             Login
@@ -228,7 +231,7 @@ export default function LandingPage({ onGetStarted }) {
         </div>
 
         <button className="show-mob" onClick={() => setMobileOpen(o => !o)}
-          style={{ background: 'none', border: scrolled ? '1.5px solid #E2E8F0' : '1.5px solid rgba(255,255,255,0.3)', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', color: scrolled ? '#374151' : '#fff', fontSize: '1.1rem' }}>
+          style={{ background: scrolled ? 'none' : 'rgba(15,23,42,0.6)', border: scrolled ? '1.5px solid #E2E8F0' : '1.5px solid rgba(255,255,255,0.3)', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', color: scrolled ? '#374151' : '#FFBF00', fontSize: '1.1rem' }}>
           {mobileOpen ? '✕' : '☰'}
         </button>
       </nav>
