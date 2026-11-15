@@ -173,11 +173,11 @@ export default function LandingPage({ onGetStarted }) {
         .show-mob{display:flex!important}
         .two-col{grid-template-columns:1fr!important;gap:24px!important}
         .four-col{grid-template-columns:1fr 1fr!important}
-        section,.lp-sec{padding:60px 18px!important}
+        section:not(#ride),.lp-sec{padding:60px 18px!important}
       }
       @media(max-width:480px){
         .four-col{grid-template-columns:1fr!important}
-        section,.lp-sec{padding:48px 16px!important}
+        section:not(#ride),.lp-sec{padding:48px 16px!important}
       }
       .show-mob{display:none}
 

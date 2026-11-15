@@ -474,10 +474,11 @@ export default function RickshawHero({ onGetStarted, onExplore }) {
   }, [])
 
   return (
-    <section className="pin" id="ride" ref={pinRef} style={{ height: '1400vh', position: 'relative' }}>
+    <section className="pin" id="ride" ref={pinRef} style={{ height: '1400vh', position: 'relative', padding: 0, margin: 0, width: '100%', maxWidth: '100vw' }}>
       <style>{`
-        .stick { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow: hidden; background: #0F172A; width: 100%; }
-        #w { position: absolute; inset: 0; width: 100%; height: 100%; }
+        #ride, #ride.pin { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100vw !important; box-sizing: border-box !important; }
+        .stick { position: sticky; top: 0; left: 0; right: 0; height: 100vh; height: 100dvh; overflow: hidden; background: #0F172A; width: 100%; padding: 0 !important; margin: 0 !important; }
+        #w { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
         #rk { position: absolute; transform-origin: 50% 100%; will-change: transform; isolation: isolate; }
         #rk img { filter: drop-shadow(0 8px 18px rgba(0,0,0,.6)); display: block; width: 100%; height: auto; }
         #rk .sh { position: absolute; left: 2%; right: 2%; bottom: -3%; height: 8%; background: radial-gradient(closest-side, rgba(0,0,0,.7), transparent); z-index: -1; }
